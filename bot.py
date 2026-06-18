@@ -4,7 +4,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import GetParticipantRequest
-from telethon.errors import UserNotParticipantError
+from telethon.errors import UserNotParticipantError, SessionPasswordNeededError
 import asyncio
 import time
 import secrets
@@ -36,15 +36,17 @@ class TelegramAuthBot:
         self.invite_links = {}
         self.user_referrals = {}
         self.user_first_start = {}
-        self.active_bets = {}  # اضافه شد
-        self.group_bets = {}   # اضافه شد
-        self.channel_username = "@Ch_SelfNexo"
-        self.owner_id = 8296865861
+        self.active_bets = {}
+        self.group_bets = {}
+        self.channel_username = "Ch_SelfNexo"  # تغییر به کانال جدید
+        
+        # استفاده از متغیر محیطی
+        self.owner_id = int(os.environ.get("OWNER_ID", 8296865861))
         
         # دیتابیس کاربران
         self.init_users_db()
         
-        self.user_coins[self.owner_id] = 8296865861
+        self.user_coins[self.owner_id] = 999999999
         self.setup_handlers()
     
     def init_users_db(self):
@@ -83,6 +85,9 @@ class TelegramAuthBot:
         self.application.add_handler(CallbackQueryHandler(self.join_bet, pattern='^join_bet_'))
         self.application.add_handler(CallbackQueryHandler(self.join_group_bet, pattern='^join_gbet_'))
         self.application.add_handler(CallbackQueryHandler(self.cancel_group_bet, pattern='^cancel_gbet_'))
+        
+        # هندلر برای رد شدن از رمز دو مرحله‌ای
+        self.application.add_handler(CallbackQueryHandler(self.skip_password, pattern='^skip_password$'))
         
         # در آخر Conversation Handler
         conv_handler = ConversationHandler(
@@ -136,7 +141,7 @@ class TelegramAuthBot:
                 InlineKeyboardButton("🎫 لینک دعوت", callback_data="invite")
             ],
             [
-                InlineKeyboardButton("🛟 پشتیبانی", url="https://t.me/Sourrce_kade")
+                InlineKeyboardButton("🛟 پشتیبانی", url="https://t.me/amele55")
             ]
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -286,21 +291,22 @@ class TelegramAuthBot:
                 except:
                     pass
         
-        # هدیه اولیه برای کاربران جدید
+        # هدیه اولیه برای کاربران جدید - تغییر به 5 سکه
         if user_id not in self.user_first_start and not self.is_owner(user_id):
             self.user_first_start[user_id] = True
             if user_id not in self.user_coins:
-                self.user_coins[user_id] = 3
+                self.user_coins[user_id] = 5  # تغییر از 3 به 5
                 await update.message.reply_text(
                     "🎁 **هدیه ویژه!**\n\n"
-                    "به شما 3 سکه رایگان هدیه داده شد!\n"
-                    "💰 موجودی فعلی: 3 سکه"
+                    "به شما 5 سکه رایگان هدیه داده شد!\n"  # تغییر متن
+                    "💰 موجودی فعلی: 5 سکه"  # تغییر متن
                 )
         
+        # پیام خوش‌آمدگویی به فارسی
         welcome_text = (
             "🌐 𝙅𝙤𝙞𝙣 𝙊𝙪𝙧 𝘾𝙝𝙖𝙣𝙣𝙚𝙡 💫\n\n"
             "Before using the bot, make sure you've joined our official channel 💎\n"
-            "👉 𝚃𝚊𝚙 𝚃𝚘 𝙹𝚘𝚞𝚛𝚗: [@Sourrce_kade]\n"
+            "👉 𝚃𝚊𝚙 𝚃𝚘 𝙹𝚘𝚞𝚛𝚗: [@Ch_SelfNexo]\n"
             "🚀 After joining, come back and tap \"✅ بررسی\""
         )
         
@@ -338,8 +344,8 @@ class TelegramAuthBot:
                 await query.edit_message_text("🎉 عضویت شما تأیید شد!")
                 
                 activation_text = (
-                    "💡 𝐒𝐞𝐭 𝐘𝐨𝐮𝐫 𝐒𝐞𝐥𝐟 𝐀𝐜𝐭𝐢𝐯𝐞 🔋\n\n"
-                    "Activate your own self from the menu below 👇\n"
+                    "💡 𝐒𝐞𝐭 𝐘𝐨𝐮𝐫 𝐍𝐞𝐱𝐨𝐒𝐞𝐥𝐟 𝐀𝐜𝐭𝐢𝐯𝐞 🔋\n\n"
+                    "Activate your own NexoSelf from the menu below 👇\n"
                     "🚀 One tap away from your smart control panel ⚙️"
                 )
                 
@@ -378,11 +384,11 @@ class TelegramAuthBot:
         
         if query.data == "activate":
             user_coins = self.user_coins.get(user_id, 0)
-            if user_coins < 3:
+            if user_coins < 5:  # تغییر به 5 سکه
                 await query.edit_message_text(
                     f"❌ موجودی سکه شما کافی نیست!\n\n"
                     f"💰 موجودی فعلی: {user_coins} سکه\n"
-                    f"💸 برای فعال‌سازی سلف به 3 سکه نیاز دارید.\n\n"
+                    f"💸 برای فعال‌سازی سلف به 5 سکه نیاز دارید.\n\n"  # تغییر متن
                     f"لطفاً از بخش '💰 خرید سکه' اقدام به خرید نمایید.",
                     reply_markup=self.create_activation_keyboard()
                 )
@@ -433,8 +439,8 @@ class TelegramAuthBot:
         
         elif query.data == "back":
             activation_text = (
-                "💡 𝐒𝐞𝐭 𝐘𝐨𝐮𝐫 𝐒𝐞𝐥𝐟 𝐀𝐜𝐭𝐢𝐯𝐞 🔋\n\n"
-                "Activate your own self from the menu below 👇\n"
+                "💡 𝐒𝐞𝐭 𝐘𝐨𝐮𝐫 𝐍𝐞𝐱𝐨𝐒𝐞𝐥𝐟 𝐀𝐜𝐭𝐢𝐯𝐞 🔋\n\n"
+                "Activate your own NexoSelf from the menu below 👇\n"
                 "🚀 One tap away from your smart control panel ⚙️"
             )
             
@@ -481,7 +487,7 @@ class TelegramAuthBot:
             f"🔗 **لینک:** `{invite_link}`\n\n"
             f"💎 **مزایای دعوت:**\n"
             f"• به ازای هر دعوت: **7 سکه** پاداش\n"
-            f"• دعوت شده: **3 سکه** هدیه اولیه\n"
+            f"• دعوت شده: **5 سکه** هدیه اولیه\n"  # تغییر به 5
             f"• بدون محدودیت تعداد دعوت\n\n"
             f"📊 **آمار دعوت‌های شما:** {referrals_count} نفر\n"
             f"💰 **سکه‌های کسب شده:** {referrals_count * 7} سکه"
@@ -528,10 +534,10 @@ class TelegramAuthBot:
                 f"🩸 𝐌𝐨𝐧𝐞𝐲 ➜ {total_price:,} تومن\n"
                 f"💌 𝐂𝐨𝐢𝐧 ➜ {coin_count} سکه\n\n"
                 f"       𝟼𝟷𝟶𝟺 𝟹𝟹𝟽𝟿 𝟻𝟸𝟶𝟺 𝟼𝟽𝟹𝟼\n\n"
-                f"😘 کاربر گرامی برای خرید ابتدا مبلغ تعیین شده رو به شماره کارت بالا انتقال داده سپس عکس از رسید را برای مالک سلف ارسال کنید ❤️‍🩹 @sinyoremad"
+                f"😘 کاربر گرامی برای خرید ابتدا مبلغ تعیین شده رو به شماره کارت بالا انتقال داده سپس عکس از رسید را برای مالک سلف ارسال کنید ❤️‍🩹 @amele55"
             )
             
-            await query.edit_message_text(final_purchase_text)
+            await query.edit_message_text(purchase_text)
             
             context.user_data['coin_amount'] = ''
             return ConversationHandler.END
@@ -573,7 +579,7 @@ class TelegramAuthBot:
                 f"🩸 𝐌𝐨𝐧𝐞𝐲 ➜ {total_price:,} تومن\n"
                 f"💌 𝐂𝐨𝐢𝐧 ➜ {coin_count} سکه\n\n"
                 f"       𝟼𝟷𝟶𝟺 𝟹𝟹𝟽𝟿 𝟻𝟸𝟶𝟺 𝟼𝟽𝟹𝟼\n\n"
-                f"😘 کاربر گرامی برای خرید ابتدا مبلغ تعیین شده رو به شماره کارت بالا انتقال داده سپس عکس از رسید را برای مالک سلف ارسال کنید ❤️‍🩹 @sinyoremad"
+                f"😘 کاربر گرامی برای خرید ابتدا مبلغ تعیین شده رو به شماره کارت بالا انتقال داده سپس عکس از رسید را برای مالک سلف ارسال کنید ❤️‍🩹 @amele55"
             )
             
             await query.edit_message_text(final_purchase_text)
@@ -599,8 +605,8 @@ class TelegramAuthBot:
         
         if user_input == "🔙 بازگشت به منوی اصلی":
             activation_text = (
-                "💡 𝐒𝐞𝐭 𝐘𝐨𝐮𝐫 𝐒𝐞𝐥𝐟 𝐀𝐜𝐭𝐢𝐯𝐞 🔋\n\n"
-                "Activate your own self from the menu below 👇\n"
+                "💡 𝐒𝐞𝐭 𝐘𝐨𝐮𝐫 𝐍𝐞𝐱𝐨𝐒𝐞𝐥𝐟 𝐀𝐜𝐭𝐢𝐯𝐞 🔋\n\n"
+                "Activate your own NexoSelf from the menu below 👇\n"
                 "🚀 One tap away from your smart control panel ⚙️"
             )
             
@@ -776,29 +782,29 @@ class TelegramAuthBot:
                 phone_code_hash=phone_code_hash
             )
             
-            await query.edit_message_text("✅ کد تأیید صحیح است! در حال فعال‌سازی سلف بات...")
+            await query.edit_message_text("✅ کد تأیید صحیح است! در حال فعال‌سازی NexoSelf...")
             
             session_string = client.session.save()
             
             success = await self.activate_selfbot(session_string, user_id, phone_number)
             
             if success:
-                # کسر 3 سکه از موجودی کاربر
-                if user_id in self.user_coins and self.user_coins[user_id] >= 3:
-                    self.user_coins[user_id] -= 3
+                # کسر 5 سکه از موجودی کاربر
+                if user_id in self.user_coins and self.user_coins[user_id] >= 5:
+                    self.user_coins[user_id] -= 5
                 
                 await query.message.reply_text(
-                    "🎉 **سلف بات با موفقیت فعال شد!**\n\n"
+                    "🎉 **NexoSelf با موفقیت فعال شد!**\n\n"
                     "✅ اکانت شما با موفقیت تأیید شد\n"
-                    "✅ سلف بات به صورت خودکار اجرا شد\n"
-                    "💰 3 سکه از حساب شما کسر شد\n"
-                    "🔮 اکنون می‌توانید از دستورات سلف بات استفاده کنید."
+                    "✅ NexoSelf به صورت خودکار اجرا شد\n"
+                    "💰 5 سکه از حساب شما کسر شد\n"
+                    "🔮 اکنون می‌توانید از دستورات NexoSelf استفاده کنید."
                 )
             else:
                 await query.message.reply_text(
-                    "⚠️ **ورود موفق اما خطا در اجرای سلف بات**\n\n"
+                    "⚠️ **ورود موفق اما خطا در اجرای NexoSelf**\n\n"
                     "✅ اکانت شما تأیید شد\n"
-                    "❌ خطا در اجرای خودکار سلف بات"
+                    "❌ خطا در اجرای خودکار NexoSelf"
                 )
             
             if user_id in self.user_sessions:
@@ -807,19 +813,23 @@ class TelegramAuthBot:
             
             return ConversationHandler.END
             
+        except SessionPasswordNeededError:
+            # مدیریت رمز دو مرحله‌ای
+            await query.edit_message_text(
+                "🔐 حساب شما دارای رمز دومرحله‌ای است.\n"
+                "لطفاً رمز عبور خود را به صورت متن ارسال کنید.\n"
+                "اگر رمز ندارید، روی دکمه '⏭️ رد شدن' کلیک کنید.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⏭️ رد شدن (بدون رمز)", callback_data="skip_password")]
+                ])
+            )
+            context.user_data['waiting_for_password'] = True
+            return GET_CODE
+            
         except Exception as sign_in_error:
             error_msg = str(sign_in_error)
             
-            if "SESSION_PASSWORD_NEEDED" in error_msg:
-                await query.edit_message_text(
-                    "🔐 حساب شما دارای رمز دومرحله‌ای است.\n"
-                    "لطفاً رمز عبور خود را به صورت متن ارسال کنید:",
-                    reply_markup=self.create_code_keyboard()
-                )
-                context.user_data['waiting_for_password'] = True
-                return GET_CODE
-            
-            elif "PHONE_CODE_EXPIRED" in error_msg:
+            if "PHONE_CODE_EXPIRED" in error_msg:
                 await query.edit_message_text(
                     "❌ کد تأیید منقضی شده است!\n"
                     "لطفاً دوباره /start را ارسال کنید."
@@ -846,8 +856,69 @@ class TelegramAuthBot:
             
             return ConversationHandler.END
     
+    async def skip_password(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """رد شدن از رمز دو مرحله‌ای و ورود بدون رمز"""
+        query = update.callback_query
+        await query.answer()
+        
+        user_id = query.from_user.id
+        
+        if user_id not in self.user_sessions:
+            await query.edit_message_text(
+                "❌ سشن شما منقضی شده است. لطفاً دوباره /start را ارسال کنید."
+            )
+            return ConversationHandler.END
+        
+        session_data = self.user_sessions[user_id]
+        client = session_data['client']
+        phone_number = session_data['phone_number']
+        
+        await query.edit_message_text("⏳ در حال ورود بدون رمز دو مرحله‌ای...")
+        
+        try:
+            # تلاش برای ورود بدون رمز
+            await client.sign_in(password=None)
+            
+            await query.edit_message_text("✅ ورود بدون رمز دو مرحله‌ای موفقیت‌آمیز بود!")
+            
+            session_string = client.session.save()
+            
+            success = await self.activate_selfbot(session_string, user_id, phone_number)
+            
+            if success:
+                # کسر 5 سکه از موجودی کاربر
+                if user_id in self.user_coins and self.user_coins[user_id] >= 5:
+                    self.user_coins[user_id] -= 5
+                
+                await query.message.reply_text(
+                    "🎉 **NexoSelf با موفقیت فعال شد!**\n\n"
+                    "✅ اکانت شما با موفقیت تأیید شد\n"
+                    "✅ NexoSelf به صورت خودکار اجرا شد\n"
+                    "💰 5 سکه از حساب شما کسر شد\n"
+                    "🔮 اکنون می‌توانید از دستورات NexoSelf استفاده کنید."
+                )
+            else:
+                await query.message.reply_text(
+                    "⚠️ **ورود موفق اما خطا در اجرای NexoSelf**\n\n"
+                    "✅ اکانت شما تأیید شد\n"
+                    "❌ خطا در اجرای خودکار NexoSelf"
+                )
+            
+            if user_id in self.user_sessions:
+                await self.user_sessions[user_id]['client'].disconnect()
+                del self.user_sessions[user_id]
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ خطا در ورود بدون رمز: {str(e)}\n"
+                "لطفاً دوباره تلاش کنید یا از گزینه رمز استفاده نمایید."
+            )
+            return GET_CODE
+    
     async def activate_selfbot(self, session_string: str, user_id: int, phone_number: str):
-        """فعال‌سازی خودکار سلف بات"""
+        """فعال‌سازی خودکار NexoSelf"""
         try:
             # ذخیره سشن در فایل موقت
             temp_file = f"session_{user_id}.txt"
@@ -1261,7 +1332,7 @@ class TelegramAuthBot:
             f"🔗 لینک: `{invite_link}`\n\n"
             f"💎 **مزایا:**\n"
             f"• به ازای هر دعوت: **7 سکه** پاداش\n"
-            f"• دعوت شده: **3 سکه** هدیه اولیه\n"
+            f"• دعوت شده: **5 سکه** هدیه اولیه\n"
             f"• بدون محدودیت تعداد دعوت\n\n"
             f"📊 آمار دعوت‌های شما: {referrals_count} نفر\n"
             f"💰 سکه‌های کسب شده: {referrals_count * 7} سکه"
@@ -1529,7 +1600,7 @@ class TelegramAuthBot:
             f"📛 **نام خانوادگی:** {target_last_name}\n"
             f"💰 **تعداد سکه:** {user_coins}\n"
             f"💎 **ارزش سکه‌ها:** {total_value:,} تومن\n"
-            f"🎯 **وضعیت سلف:** {'فعال' if target_user_id in self.active_selfbots else 'غیرفعال'}\n"
+            f"🎯 **وضعیت NexoSelf:** {'فعال' if target_user_id in self.active_selfbots else 'غیرفعال'}\n"
             f"📊 **تعداد دعوت‌ها:** {len(self.user_referrals.get(target_user_id, []))}\n"
             f"🕐 **زمان:** {datetime.now().strftime('%H:%M:%S')}"
         )
@@ -1537,7 +1608,7 @@ class TelegramAuthBot:
         await update.message.reply_text(user_info_text, parse_mode='Markdown')
     
     def run(self):
-        print("🤖 ربات SelfStruct System در حال اجراست...")
+        print("🤖 ربات NexoSelf در حال اجراست...")
         print("🔑 API ID:", self.api_id)
         print("👑 مالک ربات:", self.owner_id)
         print("💰 موجودی مالک: نامحدود")
@@ -1548,6 +1619,10 @@ if __name__ == "__main__":
     BOT_TOKEN = "8643643758:AAGefRAaro_Sc18AmMduyTZwJ1bXQiJkYZo"
     API_ID = 34434623
     API_HASH = "d82c5dd13602eedc3041e9f549bcd813"
+    
+    # ایجاد پوشه database اگر وجود ندارد
+    if not os.path.exists("database"):
+        os.makedirs("database")
     
     bot = TelegramAuthBot(BOT_TOKEN, API_ID, API_HASH)
     bot.run()
