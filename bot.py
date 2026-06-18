@@ -33,7 +33,7 @@ if not os.path.exists(DATABASE_DIR):
     os.makedirs(DATABASE_DIR)
 
 # حالت‌های مکالمه
-ACTIVATION_PANEL, GET_PHONE, GET_CODE, COIN_PURCHASE, CONFIRM_PURCHASE, ADMIN_PANEL = range(6)
+ACTIVATION_PANEL, GET_PHONE, GET_CODE, COIN_PURCHASE, CONFIRM_PURCHASE = range(5)
 
 # ─── دیتابیس ────────────────────────────────────────────────────────────────────
 def init_bot_db():
@@ -161,9 +161,8 @@ class NexoBot:
         self.card_number = get_setting_db("card_number", "6037000000000000")
         self.admin_id = int(get_setting_db("admin_id", str(OWNER_ID)))
         self.user_sessions = {}
-        self.user_coins = {}
         self.invite_links = {}
-        self.pending_approvals = {}
+        self.user_coins = {}
         
         self.setup_handlers()
     
@@ -175,7 +174,7 @@ class NexoBot:
         self.application.add_handler(CommandHandler("setcard", self.set_card_number))
         self.application.add_handler(CommandHandler("setadmin", self.set_admin_id))
         
-        # دکمه‌های منو
+        # دکمه‌های منوی اصلی
         self.application.add_handler(CallbackQueryHandler(self.main_menu_callback, pattern='^main_menu$'))
         self.application.add_handler(CallbackQueryHandler(self.help_callback, pattern='^help$'))
         self.application.add_handler(CallbackQueryHandler(self.status_callback, pattern='^status$'))
@@ -197,14 +196,14 @@ class NexoBot:
         self.application.add_handler(CallbackQueryHandler(self.approve_purchase, pattern='^approve_'))
         self.application.add_handler(CallbackQueryHandler(self.reject_purchase, pattern='^reject_'))
         
-        # دکمه‌های فرایند فعال‌سازی
-        self.application.add_handler(CallbackQueryHandler(self.activation_panel, pattern='^(activate|buy_coins|stats|invite|back|support)$'))
+        # دکمه‌های خرید سکه (مهم)
+        self.application.add_handler(CallbackQueryHandler(self.coin_purchase, pattern='^(coin_|display_coins|coin_delete|coin_submit)'))
         
         # هندلرهای پیام
         self.application.add_handler(MessageHandler(filters.PHOTO & filters.REPLY, self.handle_receipt_photo))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_messages))
         
-        # Conversation Handler برای فعال‌سازی
+        # Conversation Handler
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', self.start)],
             states={
@@ -362,15 +361,6 @@ class NexoBot:
         ]
         return InlineKeyboardMarkup(keyboard)
     
-    def create_purchase_confirmation_keyboard(self):
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ تأیید خرید", callback_data="confirm_purchase"),
-                InlineKeyboardButton("❌ انصراف", callback_data="cancel_purchase")
-            ]
-        ]
-        return InlineKeyboardMarkup(keyboard)
-    
     # ─── دستورات اصلی ──────────────────────────────────────────────────────────
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.message.from_user.id
@@ -399,7 +389,6 @@ class NexoBot:
                 "💰 موجودی فعلی: 5 سکه"
             )
         
-        # نمایش منوی اصلی
         welcome_text = (
             "💡 **به NexoSelf خوش آمدید!** 🔋\n\n"
             "🚀 لطفاً از منوی زیر گزینه مورد نظر خود را انتخاب کنید:\n\n"
@@ -434,7 +423,6 @@ class NexoBot:
 💡 **نکات:**
 • به ازای هر دعوت ۷ سکه پاداش دریافت می‌کنید
 • قیمت هر سکه: ۲۰۰ تومن
-• برای خرید سکه از گزینه خرید استفاده کنید
 
 🔮 **قدرت گرفته از:** @Ch_SelfNexo
         """
@@ -565,25 +553,31 @@ class NexoBot:
         await query.edit_message_text(status_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به منو", callback_data="main_menu")]]))
     
     async def buy_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """نمایش کیبورد خرید سکه"""
         query = update.callback_query
         await query.answer()
+        
+        # ریست کردن مقدار سکه در context
+        context.user_data['coin_amount'] = ''
         
         buy_text = f"""
 💌 **خرید سکه NexoSelf** 💌
 
 💰 هر عدد سکه: ۲۰۰ تومن
 
-📝 برای خرید، از کیبورد زیر استفاده کنید:
+📝 تعداد سکه مورد نظر را با کیبورد زیر وارد کنید:
 
 💳 شماره کارت برای واریز:
 `{self.card_number}`
 
 🆔 آیدی مالک برای پیگیری:
 @amele55
-
-📸 پس از واریز، عکس فیش را در پاسخ به این پیام ارسال کنید.
         """
-        await query.edit_message_text(buy_text, reply_markup=self.create_coin_keyboard())
+        await query.edit_message_text(
+            buy_text,
+            reply_markup=self.create_coin_keyboard()
+        )
+        return COIN_PURCHASE
     
     async def balance_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -652,6 +646,7 @@ class NexoBot:
             phone_text,
             reply_markup=self.create_phone_keyboard()
         )
+        return GET_PHONE
     
     # ─── پنل مدیریت ────────────────────────────────────────────────────────────
     async def admin_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -809,14 +804,10 @@ class NexoBot:
             await query.edit_message_text("❌ خرید یافت نشد!")
             return
         
-        # افزودن سکه به کاربر
         current_coins = get_user_coins(purchase['user_id'])
         add_user_coins(purchase['user_id'], current_coins + purchase['amount'])
-        
-        # به‌روزرسانی وضعیت
         update_purchase_status(purchase_id, "approved")
         
-        # اطلاع به کاربر
         try:
             await context.bot.send_message(
                 chat_id=purchase['user_id'],
@@ -857,7 +848,6 @@ class NexoBot:
         
         update_purchase_status(purchase_id, "rejected")
         
-        # اطلاع به کاربر
         try:
             await context.bot.send_message(
                 chat_id=purchase['user_id'],
@@ -912,6 +902,7 @@ class NexoBot:
             return GET_PHONE
         
         elif query.data == "buy_coins":
+            context.user_data['coin_amount'] = ''
             coin_text = (
                 "💌•••خرید سکه•••💌\n\n"
                 "💰 هر عدد سکه: 200 تومن\n"
@@ -968,16 +959,20 @@ class NexoBot:
             )
             return ACTIVATION_PANEL
     
-    # ─── خرید سکه ──────────────────────────────────────────────────────────────
+    # ─── خرید سکه (هندلر اصلی) ────────────────────────────────────────────────
     async def coin_purchase(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """مدیریت خرید سکه با کیبورد"""
         query = update.callback_query
         await query.answer()
         user_id = query.from_user.id
         
+        # مقدار فعلی سکه را از context بگیر
         if 'coin_amount' not in context.user_data:
             context.user_data['coin_amount'] = ''
+        
         coin_amount = context.user_data['coin_amount']
         
+        # ─── حذف ──────────────────────────────────────────────────────────────
         if query.data == "coin_delete":
             context.user_data['coin_amount'] = ''
             await query.edit_message_text(
@@ -986,6 +981,7 @@ class NexoBot:
             )
             return COIN_PURCHASE
         
+        # ─── تایید ────────────────────────────────────────────────────────────
         elif query.data == "coin_submit":
             if not coin_amount or int(coin_amount) <= 0:
                 await query.edit_message_text(
@@ -1020,21 +1016,37 @@ class NexoBot:
             context.user_data['coin_amount'] = ''
             return ConversationHandler.END
         
+        # ─── دکمه‌های عددی ────────────────────────────────────────────────────
         elif query.data.startswith("coin_"):
             digit = query.data.split("_")[1]
-            context.user_data['coin_amount'] += digit
+            # فقط اعداد 0-9 را قبول کن
+            if digit.isdigit():
+                context.user_data['coin_amount'] += digit
             updated_amount = context.user_data['coin_amount']
+            
+            # محاسبه مبلغ
+            try:
+                amount_int = int(updated_amount) if updated_amount else 0
+                price = amount_int * 200
+                price_text = f"{price:,}" if price > 0 else "۰"
+            except:
+                price_text = "۰"
+            
             await query.edit_message_text(
-                f"💌 تعداد سکه: {updated_amount}\n\n"
-                f"💰 مبلغ قابل پرداخت: {int(updated_amount or 0) * 200:,} تومن\n\n"
+                f"💌 تعداد سکه: {updated_amount or '۰'}\n\n"
+                f"💰 مبلغ قابل پرداخت: {price_text} تومن\n\n"
                 f"⌨️ از کیبورد زیر برای ادامه استفاده کنید:",
                 reply_markup=self.create_coin_keyboard(updated_amount)
             )
             return COIN_PURCHASE
         
+        # ─── نمایش تعداد ──────────────────────────────────────────────────────
         elif query.data == "display_coins":
-            await query.answer(f"تعداد سکه فعلی: {coin_amount or '0'}")
+            display = coin_amount if coin_amount else "۰"
+            await query.answer(f"تعداد سکه فعلی: {display}")
             return COIN_PURCHASE
+        
+        return COIN_PURCHASE
     
     async def confirm_purchase(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -1043,8 +1055,15 @@ class NexoBot:
         
         if query.data == "confirm_purchase":
             coin_amount = context.user_data.get('coin_amount', '0')
-            coin_count = int(coin_amount)
+            coin_count = int(coin_amount) if coin_amount else 0
             total_price = coin_count * 200
+            
+            if coin_count <= 0:
+                await query.edit_message_text(
+                    "❌ تعداد سکه نامعتبر است!",
+                    reply_markup=self.create_coin_keyboard()
+                )
+                return COIN_PURCHASE
             
             purchase_id = f"{user_id}_{int(time.time())}"
             add_pending_purchase(purchase_id, user_id, coin_count, total_price)
@@ -1386,7 +1405,6 @@ class NexoBot:
         user_id = update.message.from_user.id
         photo = update.message.photo[-1]
         
-        # پیدا کردن خرید در انتظار
         pending = get_all_pending_purchases()
         purchase = None
         for p in pending:
@@ -1448,7 +1466,6 @@ class NexoBot:
     async def handle_text_messages(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         
-        # دستورات سریع
         if text in ['راهنما', 'help']:
             await self.help_command(update, context)
         elif text in ['وضعیت', 'status']:
