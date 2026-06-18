@@ -335,9 +335,9 @@ class TelegramAccount:
 👤 **نام:** {me.first_name or '---'}
 
 📝 **دستورات موجود:**
-• `help` - نمایش منوی راهنما
-• `status` - وضعیت سیستم
-• `settings` - تنظیمات ربات
+• راهنما - نمایش منوی راهنما
+• وضعیت - وضعیت سیستم
+• تنظیمات - تنظیمات ربات
 
 🔮 **قدرت گرفته از:** @Ch_SelfNexo
             """
@@ -644,36 +644,36 @@ class TelegramAccount:
         
         help_text = f"""
 ┌─────────────────────
-│  🎭 **منوی NexoSelf**  
+│  🎭 **راهنمای کامل NexoSelf**  
 │  👤 **کاربر:** {name}
 │  📱 **شماره:** {self.phone}
 └─────────────────────
 
 🎯 **دستورات اصلی:**
-├ • `help` • `منو` - نمایش این منو
-├ • `status` • `وضعیت` - وضعیت سیستم
-├ • `heart` • `قلب` - انیمیشن قلب
-├ • `fun` • `سرگرمی` - دستورات سرگرمی
-└ • `tools` • `ابزار` - ابزارهای کاربردی
+• راهنما - نمایش این راهنما
+• وضعیت - وضعیت سیستم
+• قلب - انیمیشن قلب
+• سرگرمی - دستورات سرگرمی
+• ابزار - ابزارهای کاربردی
 
 👥 **مدیریت کاربران:**
-├ • `listcrash` • `لیست کراش` - لیست کراش
-├ • `listenemy` • `لیست انمی` - لیست دشمنان
-└ • `info` • `اطلاعات` - اطلاعات کاربر
+• لیست کراش - نمایش لیست کراش
+• لیست انمی - نمایش لیست دشمنان
+• اطلاعات - دریافت اطلاعات کاربر
 
 🏢 **مدیریت گروه:**
-├ • `tagall` • `تگ` - تگ همه اعضا
-├ • `tagadmins` • `تگ ادمین ها` - تگ ادمین‌ها
-└ • `groups` • `گروه ها` - تنظیمات گروه
+• تگ - تگ همه اعضا
+• تگ ادمین ها - تگ ادمین‌ها
+• گروه ها - تنظیمات گروه
 
 🎨 **ظاهر:**
-├ • `listfonts` • `لیست فونت` - لیست فونت‌ها
-└ • `.font 1-10` - تغییر فونت
+• لیست فونت - نمایش لیست فونت‌ها
+• .font 1-10 - تغییر فونت
 
 🤖 **قابلیت‌های هوشمند:**
-├ • `secretary` • `منشی` - منشی هوشمند
-├ • `forward` • `فوروارد` - فوروارد خودکار
-└ • `settings` • `تنظیمات` - تنظیمات ربات
+• منشی - منشی هوشمند
+• فوروارد - فوروارد خودکار
+• تنظیمات - تنظیمات ربات
 
 ⚡ **وضعیت سیستم:**
 ├ 💾 **RAM:** {memory_use:.2f}GB
@@ -739,7 +739,7 @@ class TelegramAccount:
             await event.delete()
             
         except Exception as e:
-            print(f"خطا در status برای {self.phone}: {e}")
+            print(f"خطا در وضعیت برای {self.phone}: {e}")
     
     async def heart_handler(self, event):
         try:
@@ -755,7 +755,7 @@ class TelegramAccount:
             
             await message.edit("💖 **انیمیشن قلب کامل شد!** ✨")
         except Exception as e:
-            print(f"خطا در دستور heart برای {self.phone}: {e}")
+            print(f"خطا در دستور قلب برای {self.phone}: {e}")
     
     async def listcrash_handler(self, event):
         try:
@@ -769,7 +769,7 @@ class TelegramAccount:
             await event.reply(txt)
             await event.delete()
         except Exception as e:
-            print(f"خطا در دستور listcrash برای {self.phone}: {e}")
+            print(f"خطا در دستور لیست کراش برای {self.phone}: {e}")
     
     async def listenemy_handler(self, event):
         try:
@@ -783,7 +783,7 @@ class TelegramAccount:
             await event.reply(txt)
             await event.delete()
         except Exception as e:
-            print(f"خطا در دستور listenemy برای {self.phone}: {e}")
+            print(f"خطا در دستور لیست انمی برای {self.phone}: {e}")
     
     async def tagall_handler(self, event):
         try:
@@ -809,7 +809,7 @@ class TelegramAccount:
             await event.delete()
             
         except Exception as e:
-            print(f"خطا در دستور tagall برای {self.phone}: {e}")
+            print(f"خطا در دستور تگ برای {self.phone}: {e}")
     
     async def tagadmins_handler(self, event):
         try:
@@ -829,7 +829,7 @@ class TelegramAccount:
             await event.delete()
             
         except Exception as e:
-            print(f"خطا در دستور tagadmins برای {self.phone}: {e}")
+            print(f"خطا در دستور تگ ادمین ها برای {self.phone}: {e}")
     
     async def sessions_handler(self, event):
         try:
@@ -854,7 +854,7 @@ class TelegramAccount:
             await event.delete()
             
         except Exception as e:
-            print(f"خطا در دستور sessions برای {self.phone}: {e}")
+            print(f"خطا در دستور نشست های فعال برای {self.phone}: {e}")
     
     async def info_handler(self, event):
         try:
@@ -899,7 +899,7 @@ class TelegramAccount:
             await event.delete()
             
         except Exception as e:
-            print(f"خطا در دستور info برای {self.phone}: {e}")
+            print(f"خطا در دستور اطلاعات برای {self.phone}: {e}")
     
     async def listfonts_handler(self, event):
         try:
@@ -918,22 +918,22 @@ class TelegramAccount:
             await event.reply(fonts_list)
             await event.delete()
         except Exception as e:
-            print(f"خطا در listfonts برای {self.phone}: {e}")
+            print(f"خطا در لیست فونت برای {self.phone}: {e}")
     
     async def secretary_handler(self, event):
         secretary_text = """
 ┌─────────────────────
-│  🤖 **منشی هوشمند**  
+│  🤖 **منشی هوشمند NexoSelf**  
 └─────────────────────
 
 ⚙️ **تنظیمات اصلی:**
-├ • `.secretary on/off` - فعال/غیرفعال کردن منشی
-└ • `.autoreply on/off` - فعال/غیرفعال کردن پاسخ خودکار
+• .secretary on/off - فعال/غیرفعال کردن منشی
+• .autoreply on/off - فعال/غیرفعال کردن پاسخ خودکار
 
 📝 **مدیریت پاسخ‌ها:**
-├ • `.addreply الگو|پاسخ` - افزودن پاسخ جدید
-├ • `.listreplies` - لیست تمام پاسخ‌ها
-└ • `.delreply شماره` - حذف پاسخ
+• .addreply الگو|پاسخ - افزودن پاسخ جدید
+• .listreplies - لیست تمام پاسخ‌ها
+• .delreply شماره - حذف پاسخ
         """
         await event.reply(secretary_text)
         await event.delete()
@@ -945,12 +945,12 @@ class TelegramAccount:
 └─────────────────────
 
 👥 **مدیریت اعضا:**
-├ • `.promote @user` - ارتقا به ادمین
-├ • `.demote @user` - کاهش از ادمین
-├ • `.ban @user` - بن کاربر
-├ • `.unban @user` - رفع بن
-├ • `.mute @user` - میوت کاربر
-└ • `.unmute @user` - رفع میوت
+• .promote @user - ارتقا به ادمین
+• .demote @user - کاهش از ادمین
+• .ban @user - بن کاربر
+• .unban @user - رفع بن
+• .mute @user - میوت کاربر
+• .unmute @user - رفع میوت
         """
         await event.reply(groups_text)
         await event.delete()
@@ -962,11 +962,11 @@ class TelegramAccount:
 └─────────────────────
 
 🎲 **بازی‌ها:**
-├ • `.dice 1-6` - پرتاب تاس
-├ • `.football` - بازی فوتبال
-├ • `.basket` - بازی بسکتبال
-├ • `.dart` - بازی دارت
-└ • `.slot` - ماشین اسلات
+• .dice 1-6 - پرتاب تاس با عدد دلخواه
+• .football - بازی فوتبال ⚽
+• .basket - بازی بسکتبال 🏀
+• .dart - بازی دارت 🎯
+• .slot - ماشین اسلات 🎰
         """
         await event.reply(fun_text)
         await event.delete()
@@ -978,14 +978,14 @@ class TelegramAccount:
 └─────────────────────
 
 📁 **مدیریت فایل:**
-├ • `.save` - ذخیره فایل
-├ • `.download` - دانلود فایل
-└ • `.rename نام` - تغییر نام فایل
+• .save - ذخیره فایل
+• .download - دانلود فایل
+• .rename نام - تغییر نام فایل
 
 🔍 **جستجو:**
-├ • `.search متن` - جستجوی پیام‌ها
-├ • `.find متن` - پیدا کردن متن
-└ • `.history عدد` - تاریخچه پیام‌ها
+• .search متن - جستجوی پیام‌ها
+• .find متن - پیدا کردن متن
+• .history عدد - تاریخچه پیام‌ها
         """
         await event.reply(tools_text)
         await event.delete()
@@ -993,33 +993,33 @@ class TelegramAccount:
     async def settings_handler(self, event):
         settings_text = """
 ┌─────────────────────
-│  ⚙️ **تنظیمات ربات**  
+│  ⚙️ **تنظیمات NexoSelf**  
 └─────────────────────
 
 🌐 **حالت آنلاین:**
-├ • `.online on` - همیشه آنلاین
-└ • `.online off` - حالت عادی
+• .online on - همیشه آنلاین
+• .online off - حالت عادی
 
 ⌨️ **اکشن تایپینگ:**
-├ • `.typing on` - فعال‌سازی تایپینگ
-├ • `.typing off` - غیرفعال‌سازی تایپینگ
-└ • `.typing 10` - تنظیم مدت زمان (ثانیه)
+• .typing on - فعال‌سازی تایپینگ
+• .typing off - غیرفعال‌سازی تایپینگ
+• .typing 10 - تنظیم مدت زمان (ثانیه)
 
 🤖 **قابلیت‌های هوشمند:**
-├ • `.secretary on/off` - منشی هوشمند
-├ • `.autoreply on/off` - پاسخ خودکار
-└ • `.autoforward on/off` - فوروارد خودکار
+• .secretary on/off - منشی هوشمند
+• .autoreply on/off - پاسخ خودکار
+• .autoforward on/off - فوروارد خودکار
 
 🎨 **ظاهر:**
-├ • `.timename on/off` - زمان در نام خانوادگی
-├ • `.timebio on/off` - زمان در بیوگرافی
-└ • `.font 1-10` - تغییر فونت
+• .timename on/off - زمان در نام خانوادگی
+• .timebio on/off - زمان در بیوگرافی
+• .font 1-10 - تغییر فونت
 
 👥 **مدیریت کاربران:**
-├ • `.addcrash آیدی` - افزودن به کراش
-├ • `.delcrash آیدی` - حذف از کراش
-├ • `.addenemy آیدی` - افزودن به دشمنان
-└ • `.delenemy آیدی` - حذف از دشمنان
+• .addcrash آیدی - افزودن به کراش
+• .delcrash آیدی - حذف از کراش
+• .addenemy آیدی - افزودن به دشمنان
+• .delenemy آیدی - حذف از دشمنان
         """
         await event.reply(settings_text)
         await event.delete()
@@ -1031,9 +1031,13 @@ class TelegramAccount:
 └─────────────────────
 
 📡 **قابلیت‌ها:**
-├ • فوروارد خودکار پیام‌ها
-├ • پشتیبانی از چندین کانال
-└ • فوروارد لحظه‌ای
+• فوروارد خودکار پیام‌ها از کانال به گروه
+• پشتیبانی از چندین کانال
+• فوروارد لحظه‌ای
+
+⚙️ **تنظیمات:**
+• .autoforward on - فعال‌سازی
+• .autoforward off - غیرفعال‌سازی
         """
         await event.reply(forward_text)
         await event.delete()
