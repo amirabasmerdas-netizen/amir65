@@ -25,7 +25,7 @@ logging.basicConfig(
 # ثابت‌ها
 API_ID = 34434623
 API_HASH = "d82c5dd13602eedc3041e9f549bcd813"
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8643643758:AAGefRAaro_Sc18AmMduyTZwJ1bXQiJkYZo")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8731724435:AAFYu8ARPZ0Ov5rEG2bs3RziRWB0P9_OIDA")
 OWNER_ID = int(os.environ.get("OWNER_ID", 8296865861))
 DATABASE_DIR = "database"
 
