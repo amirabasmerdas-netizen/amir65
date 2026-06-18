@@ -2030,7 +2030,7 @@ class TelegramAuthBot:
         self.application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    BOT_TOKEN = os.environ.get("BOT_TOKEN", "8731724435:AAESif1eCVP75--LGxGI8VYNasFjXYDZVo0")
+    BOT_TOKEN = os.environ.get("BOT_TOKEN", "8731724435:AAF39kY9p1-5U_Y34dOiAdddyktpYB-uIbY")
     API_ID = int(os.environ.get("API_ID", 34434623))
     API_HASH = os.environ.get("API_HASH", "d82c5dd13602eedc3041e9f549bcd813")
     
