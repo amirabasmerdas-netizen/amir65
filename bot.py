@@ -38,8 +38,8 @@ class TelegramAuthBot:
         self.user_first_start = {}
         self.active_bets = {}  # اضافه شد
         self.group_bets = {}   # اضافه شد
-        self.channel_username = ""
-        self.owner_id = 
+        self.channel_username = "@Ch_SelfNexo"
+        self.owner_id = 8296865861
         
         # دیتابیس کاربران
         self.init_users_db()
