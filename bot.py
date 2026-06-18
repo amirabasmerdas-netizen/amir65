@@ -119,7 +119,7 @@ class TelegramAuthBot:
     def create_welcome_keyboard(self):
         keyboard = [
             [
-                InlineKeyboardButton("📥 پیوستن", url="https://t.me/Sourrce_kade"),
+                InlineKeyboardButton("📥 پیوستن", url="https://t.me/Ch_SelfNexo"),
                 InlineKeyboardButton("✅ بررسی", callback_data="check")
             ]
         ]
@@ -355,7 +355,7 @@ class TelegramAuthBot:
             except UserNotParticipantError:
                 await query.edit_message_text(
                     "❌ شما هنوز عضو کانال نشده‌اید!\n\n"
-                    "لطفاً ابتدا به کانال @Sourrce_kade بپیوندید سپس روی '✅ بررسی' کلیک کنید.",
+                    "لطفاً ابتدا به کانال @Ch_SelfNexo بپیوندید سپس روی '✅ بررسی' کلیک کنید.",
                     reply_markup=self.create_welcome_keyboard()
                 )
                 await client.disconnect()
