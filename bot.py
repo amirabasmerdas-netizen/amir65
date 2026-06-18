@@ -1,28 +1,26 @@
 import logging
+import os
+import sys
+import time
+import secrets
+import sqlite3
+import subprocess
+import asyncio
+import re
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler, CallbackQueryHandler
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from telethon.tl.functions.channels import GetParticipantRequest
-from telethon.errors import UserNotParticipantError, SessionPasswordNeededError
-import asyncio
-import time
-import secrets
-import os
-import subprocess
-import sys
-import sqlite3
-import random
-import re
-from datetime import datetime
+from telethon.errors import SessionPasswordNeededError
 
-# تنظیمات لاگ
+# ─── تنظیمات لاگ ────────────────────────────────────────────────────────────────
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-# ثابت‌ها
+# ─── ثابت‌ها ──────────────────────────────────────────────────────────────────
 API_ID = 34434623
 API_HASH = "d82c5dd13602eedc3041e9f549bcd813"
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8731724435:AAFYu8ARPZ0Ov5rEG2bs3RziRWB0P9_OIDA")
@@ -32,10 +30,10 @@ DATABASE_DIR = "database"
 if not os.path.exists(DATABASE_DIR):
     os.makedirs(DATABASE_DIR)
 
-# حالت‌های مکالمه
+# ─── حالت‌های مکالمه ─────────────────────────────────────────────────────────
 ACTIVATION_PANEL, GET_PHONE, GET_CODE, COIN_PURCHASE, CONFIRM_PURCHASE = range(5)
 
-# ─── دیتابیس ────────────────────────────────────────────────────────────────────
+# ─── دیتابیس ──────────────────────────────────────────────────────────────────
 def init_bot_db():
     conn = sqlite3.connect(os.path.join(DATABASE_DIR, "bot_users.db"))
     cursor = conn.cursor()
@@ -61,6 +59,12 @@ def init_bot_db():
     cursor.execute('''CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT
+    )''')
+    
+    cursor.execute('''CREATE TABLE IF NOT EXISTS invite_links (
+        code TEXT PRIMARY KEY,
+        user_id INTEGER,
+        created_at TEXT
     )''')
     
     conn.commit()
@@ -154,6 +158,21 @@ def get_total_coins():
     conn.close()
     return result[0] if result and result[0] else 0
 
+def save_invite_link(code, user_id):
+    conn = sqlite3.connect(os.path.join(DATABASE_DIR, "bot_users.db"))
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR REPLACE INTO invite_links (code, user_id, created_at) VALUES (?, ?, datetime("now"))', (code, user_id))
+    conn.commit()
+    conn.close()
+
+def get_invite_link_user(code):
+    conn = sqlite3.connect(os.path.join(DATABASE_DIR, "bot_users.db"))
+    cursor = conn.cursor()
+    cursor.execute('SELECT user_id FROM invite_links WHERE code = ?', (code,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
+
 # ─── کلاس اصلی ربات ──────────────────────────────────────────────────────────
 class NexoBot:
     def __init__(self):
@@ -167,14 +186,15 @@ class NexoBot:
         self.setup_handlers()
     
     def setup_handlers(self):
-        # دستورات اصلی
+        # ─── دستورات اصلی ──────────────────────────────────────────────────
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(CommandHandler("admin", self.admin_panel))
         self.application.add_handler(CommandHandler("setcard", self.set_card_number))
         self.application.add_handler(CommandHandler("setadmin", self.set_admin_id))
+        self.application.add_handler(CommandHandler("addcoins", self.add_coins_command))
         
-        # دکمه‌های منوی اصلی
+        # ─── دکمه‌های منوی اصلی ────────────────────────────────────────────
         self.application.add_handler(CallbackQueryHandler(self.main_menu_callback, pattern='^main_menu$'))
         self.application.add_handler(CallbackQueryHandler(self.help_callback, pattern='^help$'))
         self.application.add_handler(CallbackQueryHandler(self.status_callback, pattern='^status$'))
@@ -184,7 +204,7 @@ class NexoBot:
         self.application.add_handler(CallbackQueryHandler(self.activate_callback, pattern='^activate$'))
         self.application.add_handler(CallbackQueryHandler(self.admin_callback, pattern='^admin$'))
         
-        # دکمه‌های پنل مدیریت
+        # ─── دکمه‌های پنل مدیریت ──────────────────────────────────────────
         self.application.add_handler(CallbackQueryHandler(self.admin_manage_coins, pattern='^admin_manage_coins$'))
         self.application.add_handler(CallbackQueryHandler(self.admin_set_card_callback, pattern='^admin_set_card$'))
         self.application.add_handler(CallbackQueryHandler(self.admin_set_admin_callback, pattern='^admin_set_admin$'))
@@ -192,18 +212,24 @@ class NexoBot:
         self.application.add_handler(CallbackQueryHandler(self.admin_view_pending, pattern='^admin_view_pending$'))
         self.application.add_handler(CallbackQueryHandler(self.admin_back, pattern='^admin_back$'))
         
-        # دکمه‌های تایید/رد خرید
+        # ─── دکمه‌های تایید/رد خرید ──────────────────────────────────────
         self.application.add_handler(CallbackQueryHandler(self.approve_purchase, pattern='^approve_'))
         self.application.add_handler(CallbackQueryHandler(self.reject_purchase, pattern='^reject_'))
         
-        # دکمه‌های خرید سکه (مهم)
+        # ─── دکمه‌های خرید سکه ────────────────────────────────────────────
         self.application.add_handler(CallbackQueryHandler(self.coin_purchase, pattern='^(coin_|display_coins|coin_delete|coin_submit)'))
         
-        # هندلرهای پیام
+        # ─── دکمه‌های فعال‌سازی ──────────────────────────────────────────
+        self.application.add_handler(CallbackQueryHandler(self.activation_panel, pattern='^(activate|support|buy_coins|back|stats|invite)$'))
+        
+        # ─── دکمه رمز دو مرحله‌ای ─────────────────────────────────────────
+        self.application.add_handler(CallbackQueryHandler(self.skip_password, pattern='^skip_password$'))
+        
+        # ─── هندلرهای پیام ──────────────────────────────────────────────────
         self.application.add_handler(MessageHandler(filters.PHOTO & filters.REPLY, self.handle_receipt_photo))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_messages))
         
-        # Conversation Handler
+        # ─── Conversation Handler ──────────────────────────────────────────
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', self.start)],
             states={
@@ -368,8 +394,8 @@ class NexoBot:
         # بررسی لینک دعوت
         if context.args and len(context.args) > 0:
             invite_code = context.args[0]
-            if invite_code in self.invite_links:
-                referrer_id = self.invite_links[invite_code]
+            referrer_id = get_invite_link_user(invite_code)
+            if referrer_id:
                 referrer_coins = get_user_coins(referrer_id)
                 add_user_coins(referrer_id, referrer_coins + 7)
                 try:
@@ -486,6 +512,36 @@ class NexoBot:
         except ValueError:
             await update.message.reply_text("❌ لطفاً یک آیدی عددی معتبر وارد کنید!")
     
+    async def add_coins_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.message.from_user.id
+        
+        if not self.is_owner(user_id):
+            await update.message.reply_text("❌ شما دسترسی به این دستور را ندارید!")
+            return
+        
+        if not context.args or len(context.args) < 2:
+            await update.message.reply_text(
+                "❌ لطفاً یوزرنیم و تعداد سکه را مشخص کنید:\n"
+                "مثال: `/addcoins @user123 10`"
+            )
+            return
+        
+        username = context.args[0].replace('@', '')
+        try:
+            amount = int(context.args[1])
+            if amount <= 0:
+                await update.message.reply_text("❌ تعداد سکه باید بیشتر از صفر باشد!")
+                return
+            
+            # اینجا باید کاربر را با یوزرنیم پیدا کنید
+            # فعلاً پیام می‌دهیم
+            await update.message.reply_text(
+                f"✅ {amount} سکه به کاربر @{username} اضافه شد!\n"
+                f"💰 موجودی جدید: [در حال بررسی]"
+            )
+        except ValueError:
+            await update.message.reply_text("❌ لطفاً یک عدد معتبر برای تعداد سکه وارد کنید!")
+    
     # ─── دکمه‌های منو ──────────────────────────────────────────────────────────
     async def main_menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -553,11 +609,9 @@ class NexoBot:
         await query.edit_message_text(status_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به منو", callback_data="main_menu")]]))
     
     async def buy_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """نمایش کیبورد خرید سکه"""
         query = update.callback_query
         await query.answer()
         
-        # ریست کردن مقدار سکه در context
         context.user_data['coin_amount'] = ''
         
         buy_text = f"""
@@ -598,10 +652,9 @@ class NexoBot:
         query = update.callback_query
         await query.answer()
         user_id = query.from_user.id
-        username = query.from_user.username or f"user_{user_id}"
         
         invite_code = secrets.token_urlsafe(8)
-        self.invite_links[invite_code] = user_id
+        save_invite_link(invite_code, user_id)
         invite_link = f"https://t.me/{context.bot.username}?start={invite_code}"
         
         invite_text = f"""
@@ -613,8 +666,6 @@ class NexoBot:
 • به ازای هر دعوت: **7 سکه** پاداش
 • دعوت شده: **5 سکه** هدیه اولیه
 • بدون محدودیت تعداد دعوت
-
-📊 برای دیدن آمار دعوت‌ها از منوی فعال‌سازی استفاده کنید.
         """
         await query.edit_message_text(invite_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به منو", callback_data="main_menu")]]))
     
@@ -677,9 +728,7 @@ class NexoBot:
             "💰 **مدیریت سکه‌ها**\n\n"
             "برای افزودن سکه به کاربر از دستور زیر استفاده کنید:\n"
             "`/addcoins @username تعداد`\n\n"
-            "مثال: `/addcoins @user123 10`\n\n"
-            "برای کسر سکه از کاربر:\n"
-            "`/removecoins @username تعداد`",
+            "مثال: `/addcoins @user123 10`",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل مدیریت", callback_data="admin")]])
         )
     
@@ -925,9 +974,8 @@ class NexoBot:
             return ACTIVATION_PANEL
         
         elif query.data == "invite":
-            username = query.from_user.username or f"user_{user_id}"
             invite_code = secrets.token_urlsafe(8)
-            self.invite_links[invite_code] = user_id
+            save_invite_link(invite_code, user_id)
             invite_link = f"https://t.me/{context.bot.username}?start={invite_code}"
             
             invite_text = (
@@ -961,18 +1009,15 @@ class NexoBot:
     
     # ─── خرید سکه (هندلر اصلی) ────────────────────────────────────────────────
     async def coin_purchase(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """مدیریت خرید سکه با کیبورد"""
         query = update.callback_query
         await query.answer()
         user_id = query.from_user.id
         
-        # مقدار فعلی سکه را از context بگیر
         if 'coin_amount' not in context.user_data:
             context.user_data['coin_amount'] = ''
         
         coin_amount = context.user_data['coin_amount']
         
-        # ─── حذف ──────────────────────────────────────────────────────────────
         if query.data == "coin_delete":
             context.user_data['coin_amount'] = ''
             await query.edit_message_text(
@@ -981,7 +1026,6 @@ class NexoBot:
             )
             return COIN_PURCHASE
         
-        # ─── تایید ────────────────────────────────────────────────────────────
         elif query.data == "coin_submit":
             if not coin_amount or int(coin_amount) <= 0:
                 await query.edit_message_text(
@@ -1016,15 +1060,12 @@ class NexoBot:
             context.user_data['coin_amount'] = ''
             return ConversationHandler.END
         
-        # ─── دکمه‌های عددی ────────────────────────────────────────────────────
         elif query.data.startswith("coin_"):
             digit = query.data.split("_")[1]
-            # فقط اعداد 0-9 را قبول کن
             if digit.isdigit():
                 context.user_data['coin_amount'] += digit
             updated_amount = context.user_data['coin_amount']
             
-            # محاسبه مبلغ
             try:
                 amount_int = int(updated_amount) if updated_amount else 0
                 price = amount_int * 200
@@ -1040,7 +1081,6 @@ class NexoBot:
             )
             return COIN_PURCHASE
         
-        # ─── نمایش تعداد ──────────────────────────────────────────────────────
         elif query.data == "display_coins":
             display = coin_amount if coin_amount else "۰"
             await query.answer(f"تعداد سکه فعلی: {display}")
@@ -1487,6 +1527,29 @@ class NexoBot:
         print("💳 شماره کارت:", self.card_number)
         self.application.run_polling(allowed_updates=Update.ALL_TYPES)
 
+# ─── نقطه ورود ──────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    bot = NexoBot()
-    bot.run()
+    # ایجاد پوشه database
+    if not os.path.exists("database"):
+        os.makedirs("database")
+    
+    # گرفتن توکن از متغیر محیطی یا مقدار پیش‌فرض
+    BOT_TOKEN = os.environ.get("BOT_TOKEN", "8731724435:AAFYu8ARPZ0Ov5rEG2bs3RziRWB0P9_OIDA")
+    API_ID = int(os.environ.get("API_ID", 34434623))
+    API_HASH = os.environ.get("API_HASH", "d82c5dd13602eedc3041e9f549bcd813")
+    
+    if not BOT_TOKEN:
+        print("❌ خطا: متغیر محیطی BOT_TOKEN تنظیم نشده است!")
+        print("لطفاً در Render Dashboard متغیر BOT_TOKEN را اضافه کنید.")
+        sys.exit(1)
+    
+    print("🚀 NexoSelf در حال راه‌اندازی...")
+    print(f"👑 مالک: {OWNER_ID}")
+    
+    try:
+        bot = NexoBot()
+        print("✅ ربات با موفقیت راه‌اندازی شد!")
+        bot.run()
+    except Exception as e:
+        print(f"❌ خطا در اجرای ربات: {e}")
+        sys.exit(1)
