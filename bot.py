@@ -1598,7 +1598,7 @@ class TelegramAuthBot:
 
 # تنظیمات اصلی
 if __name__ == "__main__":
-    BOT_TOKEN = "8643643758:AAGefRAaro_Sc18AmMduyTZwJ1bXQiJkYZo"
+    BOT_TOKEN = "8731724435:AAESif1eCVP75--LGxGI8VYNasFjXYDZVo0"
     API_ID = 34434623
     API_HASH = "d82c5dd13602eedc3041e9f549bcd813"
     
