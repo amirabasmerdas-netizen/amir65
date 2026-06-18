@@ -39,7 +39,6 @@ class AccountManager:
         self.init_accounts_db()
         
     def init_accounts_db(self):
-        """ایجاد دیتابیس برای ذخیره اطلاعات اکانت‌ها"""
         conn = sqlite3.connect(ACCOUNTS_DB)
         cursor = conn.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS accounts (
@@ -53,7 +52,6 @@ class AccountManager:
         conn.close()
     
     def add_account(self, phone, session_string):
-        """افزودن اکانت جدید به دیتابیس"""
         conn = sqlite3.connect(ACCOUNTS_DB)
         cursor = conn.cursor()
         cursor.execute('''INSERT OR REPLACE INTO accounts 
@@ -65,7 +63,6 @@ class AccountManager:
         print(f"✅ اکانت {phone} به دیتابیس اضافه شد")
     
     def get_all_accounts(self):
-        """دریافت تمام اکانت‌های فعال"""
         conn = sqlite3.connect(ACCOUNTS_DB)
         cursor = conn.cursor()
         cursor.execute('SELECT phone, session_string FROM accounts WHERE is_active = 1')
@@ -74,7 +71,6 @@ class AccountManager:
         return accounts
     
     def deactivate_account(self, phone):
-        """غیرفعال کردن اکانت"""
         conn = sqlite3.connect(ACCOUNTS_DB)
         cursor = conn.cursor()
         cursor.execute('UPDATE accounts SET is_active = 0 WHERE phone = ?', (phone,))
@@ -110,7 +106,6 @@ class TelegramAccount:
         self.is_running = False
         self.shutdown_requested = False
         
-        # 🔧 تنظیمات ضد فریز
         self.connection_retries = 0
         self.max_retries = 5
         self.last_activity = time.time()
@@ -134,11 +129,9 @@ class TelegramAccount:
         self.last_time_update = 0
         
     async def safe_initialize_client(self):
-        """اتصال ایمن با مدیریت خطا"""
         try:
             print(f"🔄 در حال راه‌اندازی اکانت {self.phone}...")
             
-            # ایجاد کلاینت با تنظیمات ضد فریز
             self.client = TelegramClient(
                 StringSession(self.session_string), 
                 API_ID, 
@@ -155,7 +148,6 @@ class TelegramAccount:
                 base_logger=None,
             )
             
-            # اتصال با timeout
             await asyncio.wait_for(self.client.connect(), timeout=30)
             
             if not await self.client.is_user_authorized():
@@ -189,13 +181,11 @@ class TelegramAccount:
             return False
     
     async def robust_initialize(self):
-        """راه‌اندازی مقاوم در برابر خطا"""
         for attempt in range(self.max_retries):
             try:
                 print(f"🔄 تلاش {attempt + 1}/{self.max_retries} برای راه‌اندازی {self.phone}")
                 
                 if await self.safe_initialize_client():
-                    # راه‌اندازی مؤلفه‌ها
                     self.init_db()
                     await self.safe_join_channels()
                     await self.set_online_status()
@@ -208,7 +198,6 @@ class TelegramAccount:
                     
                     self.is_running = True
                     
-                    # شروع تسک‌های پس‌زمینه با مدیریت خطا
                     asyncio.create_task(self.safe_update_profile_time())
                     asyncio.create_task(self.safe_maintain_online_status())
                     asyncio.create_task(self.health_monitor())
@@ -229,7 +218,6 @@ class TelegramAccount:
         return False
 
     async def health_monitor(self):
-        """مانیتورینگ سلامت اکانت"""
         while self.is_running and not self.shutdown_requested:
             try:
                 await asyncio.sleep(self.health_check_interval)
@@ -247,7 +235,6 @@ class TelegramAccount:
                 await asyncio.sleep(60)
 
     async def perform_health_check(self):
-        """انجام بررسی سلامت"""
         try:
             me = await asyncio.wait_for(self.client.get_me(), timeout=10)
             if not me:
@@ -262,7 +249,6 @@ class TelegramAccount:
             return False
 
     async def recover_connection(self):
-        """بازیابی اتصال قطع شده"""
         try:
             print(f"🔄 بازیابی اتصال برای {self.phone}")
             
@@ -287,7 +273,6 @@ class TelegramAccount:
             return False
 
     async def safe_join_channels(self):
-        """عضویت ایمن در کانال‌ها"""
         channels = [GROUP_ID, CHANNEL_ID]
         
         for channel in channels:
@@ -302,7 +287,6 @@ class TelegramAccount:
                 print(f"⚠️ خطا در پیوستن به {channel} برای {self.phone}: {e}")
 
     async def safe_pm_cleanup(self):
-        """پاکسازی ایمن پیوی"""
         try:
             dialogs = await self.client.get_dialogs(limit=30)
             
@@ -321,7 +305,6 @@ class TelegramAccount:
             print(f"⚠️ خطا در پاکسازی پیوی {self.phone}: {e}")
 
     async def safe_update_profile_time(self):
-        """به‌روزرسانی ایمن زمان"""
         while self.is_running and not self.shutdown_requested:
             try:
                 await self.update_profile_time()
@@ -330,7 +313,6 @@ class TelegramAccount:
                 await asyncio.sleep(60)
 
     async def safe_maintain_online_status(self):
-        """حفظ ایمن حالت آنلاین"""
         while self.is_running and not self.shutdown_requested:
             try:
                 await self.maintain_online_status()
@@ -338,28 +320,26 @@ class TelegramAccount:
                 print(f"⚠️ خطا در حفظ حالت آنلاین برای {self.phone}: {e}")
                 await asyncio.sleep(60)
 
-    # بقیه متدها دقیقاً مثل کد اصلی
     async def send_startup_message(self):
-        """ارسال پیام شروع به خود کاربر"""
         try:
             me = await self.client.get_me()
             welcome_text = f"""
 ┌─────────────────────
-│  🌟 **Sᴇʟғ Bᴏᴛ Aᴄᴛɪᴠᴀᴛᴇᴅ**  
+│  🌟 **NexoSelf فعال شد**  
 └─────────────────────
 
-✅ **𝑨𝒄𝒄𝒐𝒖𝒏𝒕 𝑨𝒄𝒕𝒊𝒗𝒂𝒕𝒆𝒅 𝑺𝒖𝒄𝒄𝒆𝒔𝒔𝒇𝒖𝒍𝒍𝒚!**
+✅ **اکانت با موفقیت فعال شد!**
 
-📱 **𝑷𝒉𝒐𝒏𝒆:** `{self.phone}`
-🆔 **𝑰𝑫:** `{me.id}`
-👤 **𝑵𝒂𝒎𝒆:** {me.first_name or '---'}
+📱 **شماره:** `{self.phone}`
+🆔 **آیدی:** `{me.id}`
+👤 **نام:** {me.first_name or '---'}
 
-📝 **𝑨𝒗𝒂𝒊𝒍𝒂𝒃𝒍𝒆 𝑪𝒐𝒎𝒎𝒂𝒏𝒅𝒔:**
-• `help` - 𝑫𝒊𝒔𝒑𝒍𝒂𝒚 𝒎𝒆𝒏𝒖
-• `status` - 𝑺𝒚𝒔𝒕𝒆𝒎 𝒔𝒕𝒂𝒕𝒖𝒔
-• `settings` - 𝑩𝒐𝒕 𝒔𝒆𝒕𝒕𝒊𝒏𝒈𝒔
+📝 **دستورات موجود:**
+• `help` - نمایش منوی راهنما
+• `status` - وضعیت سیستم
+• `settings` - تنظیمات ربات
 
-🔮 **𝑷𝒐𝒘𝒆𝒓𝒆𝒅 𝒃𝒚:** @Sourrce_kade
+🔮 **قدرت گرفته از:** @Ch_SelfNexo
             """
             await self.client.send_message('me', welcome_text)
             print(f"✅ پیام شروع برای {self.phone} ارسال شد")
@@ -367,22 +347,21 @@ class TelegramAccount:
             print(f"خطا در ارسال پیام شروع برای {self.phone}: {e}")
     
     async def send_login_notification(self):
-        """ارسال اطلاعیه لاگین به ادمین و گروه"""
         try:
             me = await self.client.get_me()
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
             login_message = f"""
-💌 **سلف فعال شده در:** `{current_time}`
+💌 **NexoSelf فعال شده در:** `{current_time}`
 ❤️‍🩹 **توسط:** `{self.owner_id}`
 
 📱 **شماره:** `{self.phone}`
 👤 **نام:** {me.first_name or '---'}
 🔗 **یوزرنیم:** @{me.username or '---'}
 
-🥀 **𝙾𝚠𝚗𝚎𝚛:** @sinyouremad 
-🫆 **𝚂𝚎𝚕𝚏:** @SelfDoppelBot
-🔥 **𝙶𝚛𝚘𝚙:** @DoppelGAP
+🥀 **مالک:** @amele55
+🫆 **سلف:** @Nexo55bot
+🔥 **گپ:** @Gp_SelfNexo
             """
             
             await send_to_admin(self.client, login_message, self.phone)
@@ -393,7 +372,6 @@ class TelegramAccount:
             print(f"خطا در ارسال اطلاعیه لاگین برای {self.phone}: {e}")
     
     def init_db(self):
-        """راه‌اندازی دیتابیس برای اکانت"""
         try:
             db_file = os.path.join(DATABASE_DIR, f"bot_data_{self.phone.replace('+', '')}.db")
             conn = sqlite3.connect(db_file)
@@ -439,7 +417,6 @@ class TelegramAccount:
             print(f"❌ خطا در راه‌اندازی دیتابیس برای {self.phone}: {e}")
     
     async def set_online_status(self):
-        """تنظیم حالت آنلاین"""
         try:
             js = self.get_data()
             if js.get('online_status') == 'on':
@@ -449,7 +426,6 @@ class TelegramAccount:
             print(f"خطا در تنظیم حالت آنلاین برای {self.phone}: {e}")
     
     async def maintain_online_status(self):
-        """حفظ حالت آنلاین"""
         while self.is_running and not self.shutdown_requested:
             try:
                 js = self.get_data()
@@ -461,9 +437,6 @@ class TelegramAccount:
                 await asyncio.sleep(60)
     
     async def register_handlers(self):
-        """ثبت هندلرهای رویداد"""
-        
-        # هندلر پیام‌های دریافتی از ادمین برای خاموش کردن
         @self.client.on(events.NewMessage(incoming=True, from_users=ADMIN_ID))
         async def handle_admin_commands(event):
             try:
@@ -476,7 +449,6 @@ class TelegramAccount:
             except Exception as e:
                 print(f"خطا در پردازش دستور ادمین برای {self.phone}: {e}")
         
-        # هندلر پیام‌های دریافتی
         @self.client.on(events.NewMessage(incoming=True))
         async def handle_incoming_messages(event):
             try:
@@ -509,7 +481,6 @@ class TelegramAccount:
             except Exception as e:
                 print(f"خطا در پردازش پیام دریافتی برای {self.phone}: {e}")
         
-        # هندلر پیام‌های ارسالی توسط مالک
         @self.client.on(events.NewMessage(outgoing=True))
         async def handle_outgoing_messages(event):
             try:
@@ -617,7 +588,6 @@ class TelegramAccount:
         print(f"✅ تمام هندلرها برای {self.phone} ثبت شدند")
 
     async def handle_shutdown(self, event):
-        """مدیریت خاموش کردن سلف توسط ادمین"""
         try:
             print(f"🛑 درخواست خاموش کردن برای {self.phone} از طرف ادمین")
             
@@ -636,7 +606,7 @@ class TelegramAccount:
             self.is_running = False
             
             await shutdown_msg.edit(f"""
-🔴 **سلف خاموش شد**
+🔴 **NexoSelf خاموش شد**
 
 📱 **شماره:** `{self.phone}`
 🆔 **آیدی:** `{self.owner_id}`
@@ -656,7 +626,6 @@ class TelegramAccount:
                 pass
 
     async def help_handler(self, event):
-        """هندلر دستور help"""
         try:
             help_text = await self.generate_help_text()
             await event.reply(help_text)
@@ -665,7 +634,6 @@ class TelegramAccount:
             print(f"خطا در دستور help برای {self.phone}: {e}")
     
     async def generate_help_text(self):
-        """تولید متن راهنما"""
         try:
             memory_use = psutil.Process(os.getpid()).memory_info().rss / 1024**3
         except:
@@ -676,48 +644,47 @@ class TelegramAccount:
         
         help_text = f"""
 ┌─────────────────────
-│  🎭 **Sᴇʟғ Bᴏᴛ Mᴇɴᴜ**  
-│  👤 **𝑼𝒔𝒆𝒓:** {name}
-│  📱 **𝑷𝒉𝒐𝒏𝒆:** {self.phone}
+│  🎭 **منوی NexoSelf**  
+│  👤 **کاربر:** {name}
+│  📱 **شماره:** {self.phone}
 └─────────────────────
 
-🎯 **𝑪𝒐𝒓𝒆 𝑪𝒐𝒎𝒎𝒂𝒏𝒅𝒔:**
-├ • `help` • `منو` - 𝑫𝒊𝒔𝒑𝒍𝒂𝒚 𝒕𝒉𝒊𝒔 𝒎𝒆𝒏𝒖
-├ • `status` • `وضعیت` - 𝑺𝒚𝒔𝒕𝒆𝒎 𝒔𝒕𝒂𝒕𝒖𝒔
-├ • `heart` • `قلب` - 𝑯𝒆𝒂𝒓𝒕 𝒂𝒏𝒊𝒎𝒂𝒕𝒊𝒐𝒏
-├ • `fun` • `سرگرمی` - 𝑭𝒖𝒏 𝒄𝒐𝒎𝒎𝒂𝒏𝒅𝒔
-└ • `tools` • `ابزار` - 𝑼𝒕𝒊𝒍𝒊𝒕𝒚 𝒕𝒐𝒐𝒍𝒔
+🎯 **دستورات اصلی:**
+├ • `help` • `منو` - نمایش این منو
+├ • `status` • `وضعیت` - وضعیت سیستم
+├ • `heart` • `قلب` - انیمیشن قلب
+├ • `fun` • `سرگرمی` - دستورات سرگرمی
+└ • `tools` • `ابزار` - ابزارهای کاربردی
 
-👥 **𝑼𝒔𝒆𝒓 𝑴𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕:**
-├ • `listcrash` • `لیست کراش` - 𝑪𝒓𝒖𝒔𝒉 𝒍𝒊𝒔𝒕
-├ • `listenemy` • `لیست انمی` - 𝑬𝒏𝒆𝒎𝒚 𝒍𝒊𝒔𝒕
-└ • `info` • `اطلاعات` - 𝑼𝒔𝒆𝒓 𝒊𝒏𝒇𝒐
+👥 **مدیریت کاربران:**
+├ • `listcrash` • `لیست کراش` - لیست کراش
+├ • `listenemy` • `لیست انمی` - لیست دشمنان
+└ • `info` • `اطلاعات` - اطلاعات کاربر
 
-🏢 **𝑮𝒓𝒐𝒖𝒑 𝑴𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕:**
-├ • `tagall` • `تگ` - 𝑻𝒂𝒈 𝒂𝒍𝒍 𝒎𝒆𝒎𝒃𝒆𝒓𝒔
-├ • `tagadmins` • `تگ ادمین ها` - 𝑻𝒂𝒈 𝒂𝒅𝒎𝒊𝒏𝒔
-└ • `groups` • `گروه ها` - 𝑮𝒓𝒐𝒖𝒑 𝒔𝒆𝒕𝒕𝒊𝒏𝒈𝒔
+🏢 **مدیریت گروه:**
+├ • `tagall` • `تگ` - تگ همه اعضا
+├ • `tagadmins` • `تگ ادمین ها` - تگ ادمین‌ها
+└ • `groups` • `گروه ها` - تنظیمات گروه
 
-🎨 **𝑨𝒑𝒑𝒆𝒂𝒓𝒂𝒏𝒄𝒆:**
-├ • `listfonts` • `لیست فونت` - 𝑭𝒐𝒏𝒕 𝒍𝒊𝒔𝒕
-└ • `.font 1-10` - 𝑪𝒉𝒂𝒏𝒈𝒆 𝒇𝒐𝒏𝒕
+🎨 **ظاهر:**
+├ • `listfonts` • `لیست فونت` - لیست فونت‌ها
+└ • `.font 1-10` - تغییر فونت
 
-🤖 **𝑺𝒎𝒂𝒓𝒕 𝑭𝒆𝒂𝒕𝒖𝒓𝒆𝒔:**
-├ • `secretary` • `منشی` - 𝑺𝒎𝒂𝒓𝒕 𝒔𝒆𝒄𝒓𝒆𝒕𝒂𝒓𝒚
-├ • `forward` • `فوروارد` - 𝑨𝒖𝒕𝒐 𝒇𝒐𝒓𝒘𝒂𝒓𝒅
-└ • `settings` • `تنظیمات` - 𝑩𝒐𝒕 𝒔𝒆𝒕𝒕𝒊𝒏𝒈𝒔
+🤖 **قابلیت‌های هوشمند:**
+├ • `secretary` • `منشی` - منشی هوشمند
+├ • `forward` • `فوروارد` - فوروارد خودکار
+└ • `settings` • `تنظیمات` - تنظیمات ربات
 
-⚡ **𝑺𝒚𝒔𝒕𝒆𝒎 𝑺𝒕𝒂𝒕𝒖𝒔:**
+⚡ **وضعیت سیستم:**
 ├ 💾 **RAM:** {memory_use:.2f}GB
-├ 📱 **𝑷𝒉𝒐𝒏𝒆:** {self.phone}
-└ 🆔 **𝑰𝑫:** {self.owner_id}
+├ 📱 **شماره:** {self.phone}
+└ 🆔 **آیدی:** {self.owner_id}
 
-🔮 **𝑷𝒐𝒘𝒆𝒓𝒆𝒅 𝒃𝒚:** @Sourrce_kade
+🔮 **قدرت گرفته از:** @Ch_SelfNexo
         """
         return help_text
     
     async def status_handler(self, event):
-        """هندلر وضعیت سیستم"""
         try:
             async def get_ping():
                 st = time.time()
@@ -744,29 +711,29 @@ class TelegramAccount:
             
             txt = f"""
 ┌─────────────────────
-│  📊 **Sʏsᴛᴇᴍ Sᴛᴀᴛᴜs**  
-│  👤 **𝑼𝒔𝒆𝒓:** {me.first_name or '---'}
+│  📊 **وضعیت سیستم**  
+│  👤 **کاربر:** {me.first_name or '---'}
 └─────────────────────
 
-🖥 **𝑺𝒚𝒔𝒕𝒆𝒎 𝑰𝒏𝒇𝒐:**
-├ ⏱ **𝑷𝒊𝒏𝒈:** {ping_text}
-├ 📈 **𝑹𝑨𝑴:** {mp}%
-├ 🖥 **𝑪𝑷𝑼:** {cp}%
-└ 💾 **𝑷𝒓𝒐𝒄𝒆𝒔𝒔𝒆𝒔:** {len(psutil.pids())}
+🖥 **اطلاعات سیستم:**
+├ ⏱ **پینگ:** {ping_text}
+├ 📈 **RAM:** {mp}%
+├ 🖥 **CPU:** {cp}%
+└ 💾 **پردازش‌ها:** {len(psutil.pids())}
 
-👤 **𝑨𝒄𝒄𝒐𝒖𝒏𝒕 𝑰𝒏𝒇𝒐:**
-├ 📱 **𝑷𝒉𝒐𝒏𝒆:** {self.phone}
-├ 🆔 **𝑰𝑫:** {me.id}
-├ 🔗 **𝑼𝒔𝒆𝒓𝒏𝒂𝒎𝒆:** @{me.username or '---'}
-└ 📛 **𝑳𝒂𝒔𝒕 𝑵𝒂𝒎𝒆:** {me.last_name or '---'}
+👤 **اطلاعات اکانت:**
+├ 📱 **شماره:** {self.phone}
+├ 🆔 **آیدی:** {me.id}
+├ 🔗 **یوزرنیم:** @{me.username or '---'}
+└ 📛 **نام خانوادگی:** {me.last_name or '---'}
 
-⚙️ **𝑩𝒐𝒕 𝑺𝒆𝒕𝒕𝒊𝒏𝒈𝒔:**
-├ 🌐 **𝑶𝒏𝒍𝒊𝒏𝒆 𝑺𝒕𝒂𝒕𝒖𝒔:** {js.get('online_status', 'off')}
-├ ⌨️ **𝑻𝒚𝒑𝒊𝒏𝒈 𝑨𝒄𝒕𝒊𝒐𝒏:** {js.get('typing_action', 'off')}
-├ 🤖 **𝑺𝒆𝒄𝒓𝒆𝒕𝒂𝒓𝒚:** {js.get('secretary', 'off')}
-└ 🔄 **𝑨𝒖𝒕𝒐 𝑭𝒐𝒓𝒘𝒂𝒓𝒅:** {js.get('auto_forward', 'off')}
+⚙️ **تنظیمات ربات:**
+├ 🌐 **حالت آنلاین:** {js.get('online_status', 'off')}
+├ ⌨️ **اکشن تایپینگ:** {js.get('typing_action', 'off')}
+├ 🤖 **منشی:** {js.get('secretary', 'off')}
+└ 🔄 **فوروارد خودکار:** {js.get('auto_forward', 'off')}
 
-✅ **𝑺𝒕𝒂𝒕𝒖𝒔:** 𝑨𝒄𝒕𝒊𝒗𝒆
+✅ **وضعیت:** فعال
             """
             await event.reply(txt)
             await event.delete()
@@ -775,9 +742,8 @@ class TelegramAccount:
             print(f"خطا در status برای {self.phone}: {e}")
     
     async def heart_handler(self, event):
-        """هندلر انیمیشن قلب"""
         try:
-            message = await event.reply("💫 Starting heart animation...")
+            message = await event.reply("💫 شروع انیمیشن قلب...")
             animations = ["💖", "❤️", "🧡", "💛", "💚", "💙", "💜", "🤎", "🖤", "🤍"]
             
             for x in range(3):
@@ -787,12 +753,11 @@ class TelegramAccount:
                     await message.edit(txt)
                     await asyncio.sleep(0.2)
             
-            await message.edit("💖 **Heart animation completed!** ✨")
+            await message.edit("💖 **انیمیشن قلب کامل شد!** ✨")
         except Exception as e:
             print(f"خطا در دستور heart برای {self.phone}: {e}")
     
     async def listcrash_handler(self, event):
-        """هندلر لیست کراش"""
         try:
             js = self.get_data()
             if js.get('crash'):
@@ -807,22 +772,20 @@ class TelegramAccount:
             print(f"خطا در دستور listcrash برای {self.phone}: {e}")
     
     async def listenemy_handler(self, event):
-        """هاندلر لیست دشمن"""
         try:
             js = self.get_data()
             if js.get('enemy'):
-                txt = "😈 **لیست دشمن:**\n\n"
+                txt = "😈 **لیست دشمنان:**\n\n"
                 for i in js.get('enemy', []):
                     txt += f"• [{i}](tg://user?id={i})\n"
             else:
-                txt = "😇 **لیست دشمن خالی است.**"
+                txt = "😇 **لیست دشمنان خالی است.**"
             await event.reply(txt)
             await event.delete()
         except Exception as e:
             print(f"خطا در دستور listenemy برای {self.phone}: {e}")
     
     async def tagall_handler(self, event):
-        """هندلر تگ همه"""
         try:
             if not event.is_group:
                 await event.reply("❌ **این دستور فقط در گروه کار می‌کند**")
@@ -849,7 +812,6 @@ class TelegramAccount:
             print(f"خطا در دستور tagall برای {self.phone}: {e}")
     
     async def tagadmins_handler(self, event):
-        """هندلر تگ ادمین‌ها"""
         try:
             if not event.is_group:
                 await event.reply("❌ **این دستور فقط در گروه کار می‌کند**")
@@ -870,10 +832,9 @@ class TelegramAccount:
             print(f"خطا در دستور tagadmins برای {self.phone}: {e}")
     
     async def sessions_handler(self, event):
-        """هندلر نشست‌های فعال"""
         try:
             result = await self.client(functions.account.GetAuthorizationsRequest())
-            txt = "┌─────────────────────\n│  🔐 **Aᴄᴛɪᴠᴇ Sᴇssɪᴏɴs**  \n└─────────────────────\n\n"
+            txt = "┌─────────────────────\n│  🔐 **نشست‌های فعال**  \n└─────────────────────\n\n"
             
             for i, auth in enumerate(result.authorizations, 1):
                 device = auth.device_model or "نامشخص"
@@ -896,7 +857,6 @@ class TelegramAccount:
             print(f"خطا در دستور sessions برای {self.phone}: {e}")
     
     async def info_handler(self, event):
-        """هندلر اطلاعات کاربر"""
         try:
             if event.is_reply:
                 get_message = await event.get_reply_message()
@@ -916,23 +876,23 @@ class TelegramAccount:
             
             info_text = f"""
 ┌─────────────────────
-│  👤 **Usᴇʀ Iɴғᴏ**  
+│  👤 **اطلاعات کاربر**  
 └─────────────────────
 
-🆔 **𝑰𝑫:** `{user.id}`
-👤 **𝑵𝒂𝒎𝒆:** {user.first_name or '---'}
-📛 **𝑳𝒂𝒔𝒕 𝑵𝒂𝒎𝒆:** {user.last_name or '---'}
-🔗 **𝑼𝒔𝒆𝒓𝒏𝒂𝒎𝒆:** @{user.username or '---'}
-📞 **𝑷𝒉𝒐𝒏𝒆:** {user.phone or '---'}
-📝 **𝑩𝒊𝒐:** {full.full_user.about or '---'}
+🆔 **آیدی:** `{user.id}`
+👤 **نام:** {user.first_name or '---'}
+📛 **نام خانوادگی:** {user.last_name or '---'}
+🔗 **یوزرنیم:** @{user.username or '---'}
+📞 **شماره:** {user.phone or '---'}
+📝 **بیو:** {full.full_user.about or '---'}
 
-🔍 **𝑺𝒕𝒂𝒕𝒖𝒔:**
-├ 🤖 **𝑩𝒐𝒕:** {is_bot}
-├ ☑️ **𝑽𝒆𝒓𝒊𝒇𝒊𝒆𝒅:** {is_verified}
-├ 🔒 **𝑹𝒆𝒔𝒕𝒓𝒊𝒄𝒕𝒆𝒅:** {is_restricted}
-├ ⚠️ **𝑺𝒄𝒂𝒎:** {is_scam}
-├ 🚫 **𝑭𝒂𝒌𝒆:** {is_fake}
-└ 📱 **𝑺𝒕𝒂𝒕𝒖𝒔:** {status}
+🔍 **وضعیت:**
+├ 🤖 **ربات:** {is_bot}
+├ ☑️ **تأیید شده:** {is_verified}
+├ 🔒 **محدود شده:** {is_restricted}
+├ ⚠️ **اسکم:** {is_scam}
+├ 🚫 **فیک:** {is_fake}
+└ 📱 **وضعیت:** {status}
             """
             
             await event.reply(info_text)
@@ -942,151 +902,143 @@ class TelegramAccount:
             print(f"خطا در دستور info برای {self.phone}: {e}")
     
     async def listfonts_handler(self, event):
-        """نمایش لیست فونت‌ها"""
         try:
-            fonts_list = "┌─────────────────────\n│  🎨 **Fᴏɴᴛ Lɪsᴛ**  \n└─────────────────────\n\n"
+            fonts_list = "┌─────────────────────\n│  🎨 **لیست فونت‌ها**  \n└─────────────────────\n\n"
             
             for i, font in enumerate(self.fonts, 1):
                 sample = "۱۲:۳۴"
                 if i <= len(self.fonts):
                     try:
                         converted = sample.translate(str.maketrans("۱۲۳۴", font[:4]))
-                        fonts_list += f"**{i}.** `{converted}` - Font {i}\n"
+                        fonts_list += f"**{i}.** `{converted}` - فونت {i}\n"
                     except:
-                        fonts_list += f"**{i}.** `{sample}` - Font {i}\n"
+                        fonts_list += f"**{i}.** `{sample}` - فونت {i}\n"
             
-            fonts_list += "\n📝 **Usage:** `.font number`\n**Example:** `.font 3`"
+            fonts_list += "\n📝 **نحوه استفاده:** `.font شماره`\n**مثال:** `.font 3`"
             await event.reply(fonts_list)
             await event.delete()
         except Exception as e:
             print(f"خطا در listfonts برای {self.phone}: {e}")
     
     async def secretary_handler(self, event):
-        """مدیریت منشی هوشمند"""
         secretary_text = """
 ┌─────────────────────
-│  🤖 **Sᴍᴀʀᴛ Sᴇᴄʀᴇᴛᴀʀʏ**  
+│  🤖 **منشی هوشمند**  
 └─────────────────────
 
-⚙️ **𝑴𝒂𝒊𝒏 𝑺𝒆𝒕𝒕𝒊𝒏𝒈𝒔:**
-├ • `.secretary on/off` - 𝑻𝒐𝒈𝒈𝒍𝒆 𝒔𝒆𝒄𝒓𝒆𝒕𝒂𝒓𝒚
-└ • `.autoreply on/off` - 𝑻𝒐𝒈𝒈𝒍𝒆 𝒂𝒖𝒕𝒐 𝒓𝒆𝒑𝒍𝒚
+⚙️ **تنظیمات اصلی:**
+├ • `.secretary on/off` - فعال/غیرفعال کردن منشی
+└ • `.autoreply on/off` - فعال/غیرفعال کردن پاسخ خودکار
 
-📝 **𝑹𝒆𝒔𝒑𝒐𝒏𝒔𝒆 𝑴𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕:**
-├ • `.addreply الگو|پاسخ` - 𝑨𝒅𝒅 𝒓𝒆𝒔𝒑𝒐𝒏𝒔𝒆
-├ • `.listreplies` - 𝑳𝒊𝒔𝒕 𝒂𝒍𝒍 𝒓𝒆𝒔𝒑𝒐𝒏𝒔𝒆𝒔
-└ • `.delreply شماره` - 𝑫𝒆𝒍𝒆𝒕𝒆 𝒓𝒆𝒔𝒑𝒐𝒏𝒔𝒆
+📝 **مدیریت پاسخ‌ها:**
+├ • `.addreply الگو|پاسخ` - افزودن پاسخ جدید
+├ • `.listreplies` - لیست تمام پاسخ‌ها
+└ • `.delreply شماره` - حذف پاسخ
         """
         await event.reply(secretary_text)
         await event.delete()
     
     async def groups_handler(self, event):
-        """منوی مدیریت گروه"""
         groups_text = """
 ┌─────────────────────
-│  🏢 **Gʀᴏᴜᴘ Mᴀɴᴀɢᴇᴍᴇɴᴕ**  
+│  🏢 **مدیریت گروه**  
 └─────────────────────
 
-👥 **𝑴𝒆𝒎𝒃𝒆𝒓 𝑴𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕:**
-├ • `.promote @user` - 𝑷𝒓𝒐𝒎𝒐𝒕𝒆 𝒕𝒐 𝒂𝒅𝒎𝒊𝒏
-├ • `.demote @user` - 𝑫𝒆𝒎𝒐𝒕𝒆 𝒇𝒓𝒐𝒎 𝒂𝒅𝒎𝒊𝒏
-├ • `.ban @user` - 𝑩𝒂𝒏 𝒖𝒔𝒆𝒓
-├ • `.unban @user` - 𝑼𝒏𝒃𝒂𝒏 𝒖𝒔𝒆𝒓
-├ • `.mute @user` - 𝑴𝒖𝒕𝒆 𝒖𝒔𝒆𝒓
-└ • `.unmute @user` - 𝑼𝒏𝒎𝒖𝒕𝒆 𝒖𝒔𝒆𝒓
+👥 **مدیریت اعضا:**
+├ • `.promote @user` - ارتقا به ادمین
+├ • `.demote @user` - کاهش از ادمین
+├ • `.ban @user` - بن کاربر
+├ • `.unban @user` - رفع بن
+├ • `.mute @user` - میوت کاربر
+└ • `.unmute @user` - رفع میوت
         """
         await event.reply(groups_text)
         await event.delete()
     
     async def fun_handler(self, event):
-        """منوی دستورات سرگرمی"""
         fun_text = """
 ┌─────────────────────
-│  🎮 **Fᴜɴ & Gᴀᴍᴇs**  
+│  🎮 **بازی‌ها و سرگرمی**  
 └─────────────────────
 
-🎲 **𝑮𝒂𝒎𝒆𝒔:**
-├ • `.dice 1-6` - 𝑹𝒐𝒍𝒍 𝒅𝒊𝒄𝒆
-├ • `.football` - 𝑭𝒐𝒐𝒕𝒃𝒂𝒍𝒍 𝒈𝒂𝒎𝒆
-├ • `.basket` - 𝑩𝒂𝒔𝒌𝒆𝒕𝒃𝒂𝒍𝒍 𝒈𝒂𝒎𝒆
-├ • `.dart` - 𝑫𝒂𝒓𝒕 𝒈𝒂𝒎𝒆
-└ • `.slot` - 𝑺𝒍𝒐𝒕 𝒎𝒂𝒄𝒉𝒊𝒏𝒆
+🎲 **بازی‌ها:**
+├ • `.dice 1-6` - پرتاب تاس
+├ • `.football` - بازی فوتبال
+├ • `.basket` - بازی بسکتبال
+├ • `.dart` - بازی دارت
+└ • `.slot` - ماشین اسلات
         """
         await event.reply(fun_text)
         await event.delete()
     
     async def tools_handler(self, event):
-        """منوی ابزارها"""
         tools_text = """
 ┌─────────────────────
-│  🛠 **Uᴛɪʟɪᴛʏ Tᴏᴏʟs**  
+│  🛠 **ابزارهای کاربردی**  
 └─────────────────────
 
-📁 **𝑭𝒊𝒍𝒆 𝑴𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕:**
-├ • `.save` - 𝑺𝒂𝒗𝒆 𝒇𝒊𝒍𝒆
-├ • `.download` - 𝑫𝒐𝒘𝒏𝒍𝒐𝒂𝒅 𝒇𝒊𝒍𝒆
-└ • `.rename نام` - 𝑹𝒆𝒏𝒂𝒎𝒆 𝒇𝒊𝒍𝒆
+📁 **مدیریت فایل:**
+├ • `.save` - ذخیره فایل
+├ • `.download` - دانلود فایل
+└ • `.rename نام` - تغییر نام فایل
 
-🔍 **𝑺𝒆𝒂𝒓𝒄𝒉:**
-├ • `.search متن` - 𝑺𝒆𝒂𝒓𝒄𝒉 𝒎𝒆𝒔𝒔𝒂𝒈𝒆𝒔
-├ • `.find متن` - 𝑭𝒊𝒏𝒅 𝒎𝒆𝒔𝒔𝒂𝒈𝒆𝒔
-└ • `.history عدد` - 𝑴𝒆𝒔𝒔𝒂𝒈𝒆 𝒉𝒊𝒔𝒕𝒐𝒓𝒚
+🔍 **جستجو:**
+├ • `.search متن` - جستجوی پیام‌ها
+├ • `.find متن` - پیدا کردن متن
+└ • `.history عدد` - تاریخچه پیام‌ها
         """
         await event.reply(tools_text)
         await event.delete()
     
     async def settings_handler(self, event):
-        """منوی تنظیمات"""
         settings_text = """
 ┌─────────────────────
-│  ⚙️ **Bᴏᴛ Sᴇᴛᴛɪɴɢs**  
+│  ⚙️ **تنظیمات ربات**  
 └─────────────────────
 
-🌐 **𝑶𝒏𝒍𝒊𝒏𝒆 𝑺𝒕𝒂𝒕𝒖𝒔:**
-├ • `.online on` - 𝑨𝒍𝒘𝒂𝒚𝒔 𝒐𝒏𝒍𝒊𝒏𝒆
-└ • `.online off` - 𝑫𝒆𝒇𝒂𝒖𝒍𝒕 𝒔𝒕𝒂𝒕𝒖𝒔
+🌐 **حالت آنلاین:**
+├ • `.online on` - همیشه آنلاین
+└ • `.online off` - حالت عادی
 
-⌨️ **𝑻𝒚𝒑𝒊𝒏𝒈 𝑨𝒄𝒕𝒊𝒐𝒏:**
-├ • `.typing on` - 𝑬𝒏𝒂𝒃𝒍𝒆 𝒕𝒚𝒑𝒊𝒏𝒈
-├ • `.typing off` - 𝑫𝒊𝒔𝒂𝒃𝒍𝒆 𝒕𝒚𝒑𝒊𝒏𝒈
-└ • `.typing 10` - 𝑺𝒆𝒕 𝒅𝒖𝒓𝒂𝒕𝒊𝒐𝒏 (𝒔𝒆𝒄𝒐𝒏𝒅𝒔)
+⌨️ **اکشن تایپینگ:**
+├ • `.typing on` - فعال‌سازی تایپینگ
+├ • `.typing off` - غیرفعال‌سازی تایپینگ
+└ • `.typing 10` - تنظیم مدت زمان (ثانیه)
 
-🤖 **𝑺𝒎𝒂𝒓𝒕 𝑭𝒆𝒂𝒕𝒖𝒓𝒆𝒔:**
-├ • `.secretary on/off` - 𝑺𝒎𝒂𝒓𝒕 𝒔𝒆𝒄𝒓𝒆𝒕𝒂𝒓𝒚
-├ • `.autoreply on/off` - 𝑨𝒖𝒕𝒐 𝒓𝒆𝒑𝒍𝒚
-└ • `.autoforward on/off` - 𝑨𝒖𝒕𝒐 𝒇𝒐𝒓𝒘𝒂𝒓𝒅
+🤖 **قابلیت‌های هوشمند:**
+├ • `.secretary on/off` - منشی هوشمند
+├ • `.autoreply on/off` - پاسخ خودکار
+└ • `.autoforward on/off` - فوروارد خودکار
 
-🎨 **𝑨𝒑𝒑𝒆𝒂𝒓𝒂𝒏𝒄𝒆:**
-├ • `.timename on/off` - 𝑻𝒊𝒎𝒆 𝒊𝒏 𝒏𝒂𝒎𝒆
-├ • `.timebio on/off` - 𝑻𝒊𝒎𝒆 𝒊𝒏 𝒃𝒊𝒐
-└ • `.font 1-10` - 𝑪𝒉𝒂𝒏𝒈𝒆 𝒇𝒐𝒏𝒕
+🎨 **ظاهر:**
+├ • `.timename on/off` - زمان در نام خانوادگی
+├ • `.timebio on/off` - زمان در بیوگرافی
+└ • `.font 1-10` - تغییر فونت
 
-👥 **𝑼𝒔𝒆𝒓 𝑴𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕:**
-├ • `.addcrash 𝑰𝑫` - 𝑨𝒅𝒅 𝒕𝒐 𝒄𝒓𝒖𝒔𝒉 𝒍𝒊𝒔𝒕
-├ • `.delcrash 𝑰𝑫` - 𝑹𝒆𝒎𝒐𝒗𝒆 𝒇𝒓𝒐𝒎 𝒄𝒓𝒖𝒔𝒉
-├ • `.addenemy 𝑰𝑫` - 𝑨𝒅𝒅 𝒕𝒐 𝒆𝒏𝒆𝒎𝒚
-└ • `.delenemy 𝑰𝑫` - 𝑹𝒆𝒎𝒐𝒗𝒆 𝒇𝒓𝒐𝒎 𝒆𝒏𝒆𝒎𝒚
+👥 **مدیریت کاربران:**
+├ • `.addcrash آیدی` - افزودن به کراش
+├ • `.delcrash آیدی` - حذف از کراش
+├ • `.addenemy آیدی` - افزودن به دشمنان
+└ • `.delenemy آیدی` - حذف از دشمنان
         """
         await event.reply(settings_text)
         await event.delete()
     
     async def forward_handler(self, event):
-        """منوی فوروارد خودکار"""
         forward_text = """
 ┌─────────────────────
-│  🔄 **Aᴜᴛᴏ Fᴏʀᴡᴀʀᴅ**  
+│  🔄 **فوروارد خودکار**  
 └─────────────────────
 
-📡 **𝑭𝒆𝒂𝒕𝒖𝒓𝒆𝒔:**
-├ • 𝑨𝒖𝒕𝒐𝒎𝒂𝒕𝒊𝒄𝒂𝒍𝒍𝒚 𝒇𝒐𝒓𝒘𝒂𝒓𝒅 𝒎𝒆𝒔𝒔𝒂𝒈𝒆𝒔
-├ • 𝑺𝒖𝒑𝒑𝒐𝒓𝒕𝒔 𝒎𝒖𝒍𝒕𝒊𝒑𝒍𝒆 𝒄𝒉𝒂𝒏𝒏𝒆𝒍𝒔
-└ • 𝑹𝒆𝒂𝒍-𝒕𝒊𝒎𝒆 𝒇𝒐𝒓𝒘𝒂𝒓𝒅𝒊𝒏𝒈
+📡 **قابلیت‌ها:**
+├ • فوروارد خودکار پیام‌ها
+├ • پشتیبانی از چندین کانال
+└ • فوروارد لحظه‌ای
         """
         await event.reply(forward_text)
         await event.delete()
 
     async def load_secretary_messages(self):
-        """بارگذاری پیام‌های منشی از دیتابیس"""
         try:
             db = os.path.join(DATABASE_DIR, f"bot_data_{self.phone.replace('+', '')}.db")
             conn = sqlite3.connect(db)
@@ -1104,7 +1056,6 @@ class TelegramAccount:
             print(f"خطا در بارگذاری پیام‌های منشی برای {self.phone}: {e}")
     
     async def load_auto_forward_settings(self):
-        """بارگذاری تنظیمات فوروارد خودکار"""
         try:
             db = os.path.join(DATABASE_DIR, f"bot_data_{self.phone.replace('+', '')}.db")
             conn = sqlite3.connect(db)
@@ -1124,7 +1075,6 @@ class TelegramAccount:
             print(f"خطا در بارگذاری تنظیمات فوروارد برای {self.phone}: {e}")
     
     async def auto_reply_secretary(self):
-        """پاسخگویی خودکار منشی"""
         @self.client.on(events.NewMessage(incoming=True))
         async def secretary_handler(event):
             try:
@@ -1161,8 +1111,6 @@ class TelegramAccount:
                 print(f"خطا در منشی هوشمند برای {self.phone}: {e}")
     
     async def register_settings_handlers(self):
-        """ثبت هندلرهای تنظیمات"""
-        
         @self.client.on(events.NewMessage(pattern=r'\.(online|typing|secretary|autoreply|autoforward|timename|timebio) (on|off)'))
         async def settings_handler(event):
             try:
@@ -1291,17 +1239,17 @@ class TelegramAccount:
                         
                 elif command == "addenemy":
                     if user_id in js.get('enemy', []):
-                        txt = "✅ **کاربر از قبل در لیست دشمن بود**"
+                        txt = "✅ **کاربر از قبل در لیست دشمنان بود**"
                     else:
                         js.setdefault('enemy', []).append(user_id)
-                        txt = "✅ **کاربر به لیست دشمن اضافه شد**"
+                        txt = "✅ **کاربر به لیست دشمنان اضافه شد**"
                         
                 elif command == "delenemy":
                     if user_id in js.get('enemy', []):
                         js['enemy'] = [x for x in js.get('enemy', []) if x != user_id]
-                        txt = "✅ **کاربر از لیست دشمن حذف شد**"
+                        txt = "✅ **کاربر از لیست دشمنان حذف شد**"
                     else:
-                        txt = "❌ **کاربر در لیست دشمن نبود**"
+                        txt = "❌ **کاربر در لیست دشمنان نبود**"
                 
                 self.put_data(js)
                 await event.reply(txt)
@@ -1394,7 +1342,6 @@ class TelegramAccount:
                 print(f"خطا در افزودن پاسخ برای {self.phone}: {e}")
     
     async def force_time_update(self):
-        """اجبار به به‌روزرسانی فوری زمان"""
         try:
             self.last_time_update = 0
             await self.update_profile_time()
@@ -1402,7 +1349,6 @@ class TelegramAccount:
             print(f"خطا در به‌روزرسانی فوری زمان برای {self.phone}: {e}")
     
     async def update_profile_time(self):
-        """به‌روزرسانی زمان در پروفایل"""
         while self.is_running and not self.shutdown_requested:
             try:
                 js = self.get_data()
@@ -1458,7 +1404,6 @@ class TelegramAccount:
                 await asyncio.sleep(60)
     
     def get_data(self):
-        """خواندن داده‌ها از دیتابیس"""
         try:
             db = os.path.join(DATABASE_DIR, f"bot_data_{self.phone.replace('+', '')}.db")
             conn = sqlite3.connect(db)
@@ -1476,7 +1421,6 @@ class TelegramAccount:
             return {}
     
     def put_data(self, data):
-        """نوشتن داده‌ها به دیتابیس"""
         try:
             db = os.path.join(DATABASE_DIR, f"bot_data_{self.phone.replace('+', '')}.db")
             conn = sqlite3.connect(db)
@@ -1496,7 +1440,6 @@ class TelegramAccount:
             print(f"خطا در نوشتن داده‌ها برای {self.phone}: {e}")
     
     async def check_expiration(self):
-        """بررسی انقضای اکانت"""
         while self.is_running and not self.shutdown_requested:
             if not self.is_self_valid():
                 print(f"❌ اکانت {self.phone} منقضی شده است. توقف...")
@@ -1506,7 +1449,6 @@ class TelegramAccount:
             await asyncio.sleep(60)
     
     def is_self_valid(self):
-        """بررسی اعتبار اکانت"""
         try:
             if not os.path.exists(USERS_DB):
                 return True
@@ -1525,7 +1467,6 @@ class TelegramAccount:
             return True
     
     async def run(self):
-        """اجرای اکانت"""
         try:
             success = await self.robust_initialize()
             if success:
@@ -1539,7 +1480,6 @@ class TelegramAccount:
             self.is_running = False
 
 async def create_session_file(phone, session_file):
-    """ایجاد فایل سشن جدید"""
     try:
         print(f"📱 ایجاد سشن جدید برای {phone}...")
         
@@ -1576,22 +1516,21 @@ async def create_session_file(phone, session_file):
         return None
 
 async def main():
-    """تابع اصلی"""
     if len(sys.argv) < 3:
         print("""
-🚀 **Sᴇʟғ Bᴏᴛ Lᴀᴜɴᴄʜᴇʀ**
+🚀 **راه‌اندازی NexoSelf**
 
-📝 **𝑼𝒔𝒂𝒈𝒆:**
-├ • 𝑨𝒅𝒅 𝒏𝒆𝒘 𝒂𝒄𝒄𝒐𝒖𝒏𝒕:
+📝 **نحوه استفاده:**
+├ • افزودن اکانت جدید:
 │   python script.py <phone> <session_file>
 │
-├ • 𝑹𝒖𝒏 𝒂𝒍𝒍 𝒂𝒄𝒄𝒐𝒖𝒏𝒕𝒔:
+├ • اجرای تمام اکانت‌ها:
 │   python script.py --multi
 │
-├ • 𝑪𝒓𝒆𝒂𝒕𝒆 𝒏𝒆𝒘 𝒔𝒆𝒔𝒔𝒊𝒐𝒏:
+├ • ایجاد سشن جدید:
 │   python script.py --create <phone> <session_file>
 └
-📞 **𝑬𝒙𝒂𝒎𝒑𝒍𝒆𝒔:**
+📞 **مثال‌ها:**
 ├ • python script.py +1234567890 session1.txt
 ├ • python script.py --multi
 └ • python script.py --create +1234567890 newsession.txt
@@ -1671,8 +1610,8 @@ if __name__ == '__main__':
     try:
         print("""
 ┌────────────────────
-│  🚀 **Sᴇʟғ Bᴏᴛ Sᴛᴀʀᴛᴇᴅ**  
-│  🔮 **𝑷𝒐𝒘𝒆𝒓𝒆𝒅 𝒃𝒚:** @Sourrce_kade
+│  🚀 **NexoSelf راه‌اندازی شد**  
+│  🔮 **قدرت گرفته از:** @Ch_SelfNexo
 └─────────────────────
         """)
         asyncio.run(main())
