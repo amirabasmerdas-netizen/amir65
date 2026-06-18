@@ -5,9 +5,10 @@ import time
 import secrets
 import sqlite3
 import subprocess
-import asyncio
 import re
 from datetime import datetime
+import asyncio
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler, CallbackQueryHandler
 from telethon import TelegramClient
@@ -117,16 +118,6 @@ def add_pending_purchase(purchase_id, user_id, amount, price):
     conn.commit()
     conn.close()
 
-def get_pending_purchase(purchase_id):
-    conn = sqlite3.connect(os.path.join(DATABASE_DIR, "bot_users.db"))
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM pending_purchases WHERE id = ?', (purchase_id,))
-    result = cursor.fetchone()
-    conn.close()
-    if result:
-        return {"id": result[0], "user_id": result[1], "amount": result[2], "price": result[3], "status": result[4], "timestamp": result[5]}
-    return None
-
 def get_all_pending_purchases():
     conn = sqlite3.connect(os.path.join(DATABASE_DIR, "bot_users.db"))
     cursor = conn.cursor()
@@ -173,6 +164,16 @@ def get_invite_link_user(code):
     conn.close()
     return result[0] if result else None
 
+def get_user_by_username(username):
+    """پیدا کردن کاربر با یوزرنیم"""
+    conn = sqlite3.connect(os.path.join(DATABASE_DIR, "bot_users.db"))
+    cursor = conn.cursor()
+    # اینجا باید از دیتابیس دیگری استفاده کنید، فعلاً ساده می‌کنیم
+    cursor.execute('SELECT user_id FROM users WHERE phone LIKE ?', (f'%{username}%',))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
+
 # ─── کلاس اصلی ربات ──────────────────────────────────────────────────────────
 class NexoBot:
     def __init__(self):
@@ -180,7 +181,6 @@ class NexoBot:
         self.card_number = get_setting_db("card_number", "6037000000000000")
         self.admin_id = int(get_setting_db("admin_id", str(OWNER_ID)))
         self.user_sessions = {}
-        self.invite_links = {}
         self.user_coins = {}
         
         self.setup_handlers()
@@ -193,6 +193,7 @@ class NexoBot:
         self.application.add_handler(CommandHandler("setcard", self.set_card_number))
         self.application.add_handler(CommandHandler("setadmin", self.set_admin_id))
         self.application.add_handler(CommandHandler("addcoins", self.add_coins_command))
+        self.application.add_handler(CommandHandler("removecoins", self.remove_coins_command))
         
         # ─── دکمه‌های منوی اصلی ────────────────────────────────────────────
         self.application.add_handler(CallbackQueryHandler(self.main_menu_callback, pattern='^main_menu$'))
@@ -407,12 +408,13 @@ class NexoBot:
                     pass
         
         # هدیه اولیه
-        if get_user_coins(user_id) == 0 and not self.is_owner(user_id):
+        current_coins = get_user_coins(user_id)
+        if current_coins == 0 and not self.is_owner(user_id):
             add_user_coins(user_id, 5)
             await update.message.reply_text(
                 "🎁 **هدیه ویژه!**\n\n"
                 "به شما 5 سکه رایگان هدیه داده شد!\n"
-                "💰 موجودی فعلی: 5 سکه"
+                f"💰 موجودی فعلی: 5 سکه"
             )
         
         welcome_text = (
@@ -512,35 +514,125 @@ class NexoBot:
         except ValueError:
             await update.message.reply_text("❌ لطفاً یک آیدی عددی معتبر وارد کنید!")
     
+    # ─── دستورات مدیریت سکه (اصلاح شده) ──────────────────────────────────────
     async def add_coins_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """افزودن سکه به کاربر (فقط مالک)"""
         user_id = update.message.from_user.id
         
         if not self.is_owner(user_id):
             await update.message.reply_text("❌ شما دسترسی به این دستور را ندارید!")
             return
         
-        if not context.args or len(context.args) < 2:
+        # بررسی ریپلای
+        if not update.message.reply_to_message:
             await update.message.reply_text(
-                "❌ لطفاً یوزرنیم و تعداد سکه را مشخص کنید:\n"
-                "مثال: `/addcoins @user123 10`"
+                "❌ لطفاً روی پیام کاربر مورد نظر ریپلای کنید!\n"
+                "مثال: روی پیام کاربر ریپلای کنید و سپس `/addcoins 10`"
             )
             return
         
-        username = context.args[0].replace('@', '')
+        if not context.args:
+            await update.message.reply_text(
+                "❌ لطفاً تعداد سکه را مشخص کنید:\n"
+                "مثال: `/addcoins 10`"
+            )
+            return
+        
         try:
-            amount = int(context.args[1])
+            amount = int(context.args[0])
             if amount <= 0:
                 await update.message.reply_text("❌ تعداد سکه باید بیشتر از صفر باشد!")
                 return
             
-            # اینجا باید کاربر را با یوزرنیم پیدا کنید
-            # فعلاً پیام می‌دهیم
+            # دریافت اطلاعات کاربر از ریپلای
+            target_user = update.message.reply_to_message.from_user
+            target_user_id = target_user.id
+            target_username = target_user.username or target_user.first_name or str(target_user_id)
+            
+            # افزودن سکه
+            current_coins = get_user_coins(target_user_id)
+            add_user_coins(target_user_id, current_coins + amount)
+            
             await update.message.reply_text(
-                f"✅ {amount} سکه به کاربر @{username} اضافه شد!\n"
-                f"💰 موجودی جدید: [در حال بررسی]"
+                f"✅ {amount} سکه به کاربر {target_username} اضافه شد!\n"
+                f"💰 موجودی جدید: {current_coins + amount} سکه"
             )
+            
+            # اطلاع به کاربر
+            try:
+                await context.bot.send_message(
+                    chat_id=target_user_id,
+                    text=f"🎉 {amount} سکه به حساب شما اضافه شد!\n"
+                         f"💰 موجودی جدید: {current_coins + amount} سکه"
+                )
+            except:
+                pass
+                
         except ValueError:
-            await update.message.reply_text("❌ لطفاً یک عدد معتبر برای تعداد سکه وارد کنید!")
+            await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کنید!")
+    
+    async def remove_coins_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """کسر سکه از کاربر (فقط مالک)"""
+        user_id = update.message.from_user.id
+        
+        if not self.is_owner(user_id):
+            await update.message.reply_text("❌ شما دسترسی به این دستور را ندارید!")
+            return
+        
+        # بررسی ریپلای
+        if not update.message.reply_to_message:
+            await update.message.reply_text(
+                "❌ لطفاً روی پیام کاربر مورد نظر ریپلای کنید!\n"
+                "مثال: روی پیام کاربر ریپلای کنید و سپس `/removecoins 10`"
+            )
+            return
+        
+        if not context.args:
+            await update.message.reply_text(
+                "❌ لطفاً تعداد سکه را مشخص کنید:\n"
+                "مثال: `/removecoins 10`"
+            )
+            return
+        
+        try:
+            amount = int(context.args[0])
+            if amount <= 0:
+                await update.message.reply_text("❌ تعداد سکه باید بیشتر از صفر باشد!")
+                return
+            
+            # دریافت اطلاعات کاربر از ریپلای
+            target_user = update.message.reply_to_message.from_user
+            target_user_id = target_user.id
+            target_username = target_user.username or target_user.first_name or str(target_user_id)
+            
+            # کسر سکه
+            current_coins = get_user_coins(target_user_id)
+            if current_coins < amount:
+                await update.message.reply_text(
+                    f"❌ موجودی کاربر کافی نیست!\n"
+                    f"💰 موجودی فعلی: {current_coins} سکه"
+                )
+                return
+            
+            update_user_coins(target_user_id, current_coins - amount)
+            
+            await update.message.reply_text(
+                f"✅ {amount} سکه از کاربر {target_username} کسر شد!\n"
+                f"💰 موجودی جدید: {current_coins - amount} سکه"
+            )
+            
+            # اطلاع به کاربر
+            try:
+                await context.bot.send_message(
+                    chat_id=target_user_id,
+                    text=f"⚠️ {amount} سکه از حساب شما کسر شد!\n"
+                         f"💰 موجودی جدید: {current_coins - amount} سکه"
+                )
+            except:
+                pass
+                
+        except ValueError:
+            await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کنید!")
     
     # ─── دکمه‌های منو ──────────────────────────────────────────────────────────
     async def main_menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -726,9 +818,13 @@ class NexoBot:
         
         await query.edit_message_text(
             "💰 **مدیریت سکه‌ها**\n\n"
-            "برای افزودن سکه به کاربر از دستور زیر استفاده کنید:\n"
-            "`/addcoins @username تعداد`\n\n"
-            "مثال: `/addcoins @user123 10`",
+            "برای افزودن سکه به کاربر:\n"
+            "1️⃣ روی پیام کاربر ریپلای کنید\n"
+            "2️⃣ دستور `/addcoins تعداد` را ارسال کنید\n\n"
+            "برای کسر سکه از کاربر:\n"
+            "1️⃣ روی پیام کاربر ریپلای کنید\n"
+            "2️⃣ دستور `/removecoins تعداد` را ارسال کنید\n\n"
+            "مثال: `/addcoins 10`",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل مدیریت", callback_data="admin")]])
         )
     
@@ -847,7 +943,14 @@ class NexoBot:
             return
         
         purchase_id = query.data.replace('approve_', '')
-        purchase = get_pending_purchase(purchase_id)
+        
+        # پیدا کردن خرید
+        pending = get_all_pending_purchases()
+        purchase = None
+        for p in pending:
+            if p['id'] == purchase_id:
+                purchase = p
+                break
         
         if not purchase:
             await query.edit_message_text("❌ خرید یافت نشد!")
@@ -889,7 +992,14 @@ class NexoBot:
             return
         
         purchase_id = query.data.replace('reject_', '')
-        purchase = get_pending_purchase(purchase_id)
+        
+        # پیدا کردن خرید
+        pending = get_all_pending_purchases()
+        purchase = None
+        for p in pending:
+            if p['id'] == purchase_id:
+                purchase = p
+                break
         
         if not purchase:
             await query.edit_message_text("❌ خرید یافت نشد!")
@@ -1139,7 +1249,7 @@ class NexoBot:
             )
             return COIN_PURCHASE
     
-    # ─── دریافت شماره و کد ──────────────────────────────────────────────────────
+    # ─── دریافت شماره و کد (اصلاح شده) ─────────────────────────────────────────
     async def get_phone_number(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_input = update.message.text
         user_id = update.message.from_user.id
@@ -1152,25 +1262,43 @@ class NexoBot:
             await update.message.reply_text(activation_text, reply_markup=self.create_activation_keyboard())
             return ACTIVATION_PANEL
         
-        phone_number = user_input
+        # پردازش شماره تلفن
+        phone_number = user_input.strip()
+        
+        # حذف فاصله و کاراکترهای اضافی
         phone_number = ''.join(filter(str.isdigit, phone_number))
         
+        # فرمت‌دهی شماره
         if phone_number.startswith('98') and len(phone_number) == 11:
             phone_number = '+' + phone_number
         elif phone_number.startswith('09') and len(phone_number) == 11:
             phone_number = '+98' + phone_number[1:]
         elif len(phone_number) == 10 and phone_number.startswith('9'):
             phone_number = '+98' + phone_number
+        elif len(phone_number) == 11 and phone_number.startswith('9'):
+            phone_number = '+98' + phone_number[1:]
         
-        if len(phone_number) < 10:
+        # اعتبارسنجی نهایی
+        if len(phone_number) < 10 or not phone_number.startswith('+'):
             await update.message.reply_text(
                 "❌ شماره تلفن معتبر نیست!\n\n"
                 "لطفاً شماره خود را به درستی وارد کنید:\n"
-                "مثال: +989123456789 یا 09123456789\n\n"
+                "• +989123456789\n"
+                "• 09123456789\n\n"
                 "یا برای بازگشت از دکمه زیر استفاده کنید:",
                 reply_markup=self.create_phone_keyboard()
             )
             return GET_PHONE
+        
+        # ذخیره شماره در دیتابیس
+        try:
+            conn = sqlite3.connect(os.path.join(DATABASE_DIR, "bot_users.db"))
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET phone = ? WHERE user_id = ?', (phone_number, user_id))
+            conn.commit()
+            conn.close()
+        except:
+            pass
         
         try:
             processing_msg = await update.message.reply_text("⏳ در حال ارسال کد تأیید...")
@@ -1200,7 +1328,10 @@ class NexoBot:
                 return GET_PHONE
         except Exception as e:
             logging.error(f"Error in get_phone_number: {e}")
-            await update.message.reply_text("❌ خطایی رخ داد. لطفاً دوباره تلاش کنید:", reply_markup=self.create_phone_keyboard())
+            await update.message.reply_text(
+                f"❌ خطایی رخ داد: {str(e)}\nلطفاً دوباره تلاش کنید:",
+                reply_markup=self.create_phone_keyboard()
+            )
             return GET_PHONE
     
     async def send_verification_code(self, phone_number: str, user_id: int):
@@ -1278,7 +1409,8 @@ class NexoBot:
             
             if success:
                 current_coins = get_user_coins(user_id)
-                update_user_coins(user_id, current_coins - 5)
+                if current_coins >= 5:
+                    update_user_coins(user_id, current_coins - 5)
                 await query.message.reply_text(
                     "🎉 **NexoSelf با موفقیت فعال شد!**\n\n"
                     "✅ اکانت شما با موفقیت تأیید شد\n"
@@ -1346,7 +1478,8 @@ class NexoBot:
             
             if success:
                 current_coins = get_user_coins(user_id)
-                update_user_coins(user_id, current_coins - 5)
+                if current_coins >= 5:
+                    update_user_coins(user_id, current_coins - 5)
                 await update.message.reply_text(
                     "🎉 **NexoSelf با موفقیت فعال شد!**\n\n"
                     "✅ اکانت شما با موفقیت تأیید شد\n"
@@ -1399,7 +1532,8 @@ class NexoBot:
             
             if success:
                 current_coins = get_user_coins(user_id)
-                update_user_coins(user_id, current_coins - 5)
+                if current_coins >= 5:
+                    update_user_coins(user_id, current_coins - 5)
                 await query.message.reply_text(
                     "🎉 **NexoSelf با موفقیت فعال شد!**\n\n"
                     "✅ اکانت شما با موفقیت تأیید شد\n"
@@ -1532,16 +1666,6 @@ if __name__ == "__main__":
     # ایجاد پوشه database
     if not os.path.exists("database"):
         os.makedirs("database")
-    
-    # گرفتن توکن از متغیر محیطی یا مقدار پیش‌فرض
-    BOT_TOKEN = os.environ.get("BOT_TOKEN", "8731724435:AAFYu8ARPZ0Ov5rEG2bs3RziRWB0P9_OIDA")
-    API_ID = int(os.environ.get("API_ID", 34434623))
-    API_HASH = os.environ.get("API_HASH", "d82c5dd13602eedc3041e9f549bcd813")
-    
-    if not BOT_TOKEN:
-        print("❌ خطا: متغیر محیطی BOT_TOKEN تنظیم نشده است!")
-        print("لطفاً در Render Dashboard متغیر BOT_TOKEN را اضافه کنید.")
-        sys.exit(1)
     
     print("🚀 NexoSelf در حال راه‌اندازی...")
     print(f"👑 مالک: {OWNER_ID}")
