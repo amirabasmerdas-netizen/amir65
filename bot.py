@@ -277,7 +277,7 @@ class TelegramAuthBot:
                 except:
                     pass
 
-        # هدیه اولیه
+        # هدیه اولیه (5 سکه)
         if user_id not in self.user_first_start and not self.is_owner(user_id):
             self.user_first_start[user_id] = True
             if user_id not in self.user_coins:
@@ -288,7 +288,7 @@ class TelegramAuthBot:
                     "💰 موجودی فعلی: 5 سکه"
                 )
 
-        # نمایش پنل فعال‌سازی
+        # نمایش مستقیم پنل فعال‌سازی (بدون نیاز به جوین کانال)
         activation_text = (
             "💡 **فعال‌سازی سلف خود را از منوی زیر شروع کنید** 🔋\n\n"
             "🚀 **برای فعال‌سازی سلف، روی دکمه زیر کلیک کنید** ⚙️"
@@ -852,7 +852,8 @@ class TelegramAuthBot:
 
     async def skip_password(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """رد شدن از رمز دو مرحله‌ای و ورود بدون رمز"""
-        query = update.callback_query        await query.answer()
+        query = update.callback_query
+        await query.answer()
         
         user_id = query.from_user.id
         
@@ -1597,7 +1598,7 @@ class TelegramAuthBot:
 
 # تنظیمات اصلی
 if __name__ == "__main__":
-    BOT_TOKEN = "8731724435:AAESif1eCVP75--LGxGI8VYNasFjXYDZVo0"
+    BOT_TOKEN = "8643643758:AAGefRAaro_Sc18AmMduyTZwJ1bXQiJkYZo"
     API_ID = 34434623
     API_HASH = "d82c5dd13602eedc3041e9f549bcd813"
     
