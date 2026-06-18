@@ -44,7 +44,7 @@ class TelegramAuthBot:
         # دیتابیس کاربران
         self.init_users_db()
         
-        self.user_coins[self.owner_id] = 999999999
+        self.user_coins[self.owner_id] = 8296865861
         self.setup_handlers()
     
     def init_users_db(self):
